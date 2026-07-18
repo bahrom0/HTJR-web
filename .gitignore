@@ -1,0 +1,47 @@
+# Local agent and browser state
+.agents/
+.codex/
+.playwright-mcp/
+
+# Legacy and local source material outside the new Web/API projects
+HTR v2 CER/
+android/
+android_app_instructions/
+docs/
+ops/
+web_app_instructions/
+Датасет 1000 реал фотографии/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# JavaScript build/runtime
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+web_app/.playwright-cli/
+web_app/output/
+
+# Python build/runtime
+.venv/
+.venv-*/
+.uv-cache/
+.uv-python/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+
+# Runtime data and model weights
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+api_server/data/
+api_server/models/*
+!api_server/models/manifest.json

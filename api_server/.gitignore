@@ -1,0 +1,14 @@
+.venv/
+.venv-*/
+.uv-cache/
+.uv-python/
+__pycache__/
+.pytest_cache/
+data/*.sqlite3
+data/originals/
+data/prepared/
+data/crops/
+data/exports/
+data/temporary/
+models/*
+!models/manifest.json

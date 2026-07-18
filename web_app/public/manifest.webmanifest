@@ -1,0 +1,19 @@
+{
+  "name": "Tajik HTR Studio",
+  "short_name": "Tajik HTR",
+  "description": "Рабочая оболочка для оцифровки таджикских рукописных документов.",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FDFCF8",
+  "theme_color": "#FDFCF8",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

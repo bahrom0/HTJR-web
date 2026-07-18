@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tajik-htr-studio-api"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.34.0",
+  "pydantic==2.13.4",
+  "numpy==2.2.3",
+  "pillow==11.1.0",
+]
+
+[project.optional-dependencies]
+dev = ["httpx==0.28.1", "pytest==9.1.1"]
+
+[project.scripts]
+tajik-htr-api = "app.cli:run_api"
+tajik-htr-worker = "app.cli:run_worker"
+tajik-htr-issue-access-code = "app.cli:issue_access_code"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
