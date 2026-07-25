@@ -28,6 +28,13 @@ class Settings:
     job_max_attempts: int
     worker_lease_seconds: int
     worker_poll_seconds: float
+    sse_heartbeat_seconds: float
+    sse_poll_seconds: float
+    ml_device: str
+    craft_max_edge: int
+    line_crop_padding: float
+    trocr_num_beams: int
+    trocr_max_new_tokens: int
 
 
 def read_settings(source: dict[str, str] | None = None) -> Settings:
@@ -40,14 +47,33 @@ def read_settings(source: dict[str, str] | None = None) -> Settings:
         raise ValueError("HTR_WORKER_HEARTBEAT_SECONDS must be positive")
     worker_lease_seconds = int(values.get("HTR_WORKER_LEASE_SECONDS", "90"))
     worker_poll_seconds = float(values.get("HTR_WORKER_POLL_SECONDS", "1"))
+    sse_heartbeat_seconds = float(values.get("HTR_SSE_HEARTBEAT_SECONDS", "15"))
+    sse_poll_seconds = float(values.get("HTR_SSE_POLL_SECONDS", "0.5"))
     job_queue_capacity = int(values.get("HTR_JOB_QUEUE_CAPACITY", "32"))
     job_max_attempts = int(values.get("HTR_JOB_MAX_ATTEMPTS", "3"))
+    ml_device = values.get("HTR_ML_DEVICE", "auto").lower()
+    craft_max_edge = int(values.get("HTR_CRAFT_MAX_EDGE", "2048"))
+    line_crop_padding = float(values.get("HTR_LINE_CROP_PADDING", "0.08"))
+    trocr_num_beams = int(values.get("HTR_TROCR_NUM_BEAMS", "1"))
+    trocr_max_new_tokens = int(values.get("HTR_TROCR_MAX_NEW_TOKENS", "128"))
     if worker_lease_seconds <= heartbeat:
         raise ValueError("HTR_WORKER_LEASE_SECONDS must exceed the heartbeat interval")
     if worker_poll_seconds <= 0:
         raise ValueError("HTR_WORKER_POLL_SECONDS must be positive")
+    if sse_heartbeat_seconds <= 0 or sse_poll_seconds <= 0:
+        raise ValueError("SSE heartbeat and poll intervals must be positive")
+    if sse_poll_seconds > sse_heartbeat_seconds:
+        raise ValueError("HTR_SSE_POLL_SECONDS must not exceed HTR_SSE_HEARTBEAT_SECONDS")
     if job_queue_capacity < 1 or job_max_attempts < 1:
         raise ValueError("Job capacity and attempts must be positive")
+    if ml_device not in {"auto", "cpu", "cuda"}:
+        raise ValueError("HTR_ML_DEVICE must be auto, cpu, or cuda")
+    if not 256 <= craft_max_edge <= 4096:
+        raise ValueError("HTR_CRAFT_MAX_EDGE must be between 256 and 4096")
+    if not 0 <= line_crop_padding <= 0.25:
+        raise ValueError("HTR_LINE_CROP_PADDING must be between 0 and 0.25")
+    if not 1 <= trocr_num_beams <= 4 or not 1 <= trocr_max_new_tokens <= 256:
+        raise ValueError("TrOCR generation settings are outside safe bounds")
     project_root = Path(__file__).resolve().parents[2]
     data_root = Path(values.get("HTR_DATA_ROOT", str(project_root / "data"))).resolve()
     environment = values.get("HTR_API_ENV", "development")
@@ -73,6 +99,13 @@ def read_settings(source: dict[str, str] | None = None) -> Settings:
         job_max_attempts,
         worker_lease_seconds,
         worker_poll_seconds,
+        sse_heartbeat_seconds,
+        sse_poll_seconds,
+        ml_device,
+        craft_max_edge,
+        line_crop_padding,
+        trocr_num_beams,
+        trocr_max_new_tokens,
     )
 
 

@@ -40,16 +40,27 @@ export function PrimaryNavigation({ onLogout }: Readonly<{ onLogout: () => void 
           <div className="primary-navigation__main">
             {navigationItems.map(([to, label, icon]) => (
               <NavLink key={to} to={to} end={to === '/'} onClick={closeMenu}>
-                <Icon name={icon as IconName} /><span>{label}</span>
+                <Icon name={icon as IconName} />
+                <span>{label}</span>
               </NavLink>
             ))}
             <NavLink className="primary-navigation__cta" to="/capture" onClick={closeMenu}>
-              <Icon name="scan" /><span>Распознать</span>
+              <Icon name="scan" />
+              <span>Распознать</span>
             </NavLink>
           </div>
           <div className="primary-navigation__mobile-tools">
             <ThemeToggle />
-            <button className="ui-button ui-button--quiet" type="button" onClick={() => { closeMenu(); onLogout(); }}>Выйти из сессии</button>
+            <button
+              className="ui-button ui-button--quiet"
+              type="button"
+              onClick={() => {
+                closeMenu();
+                onLogout();
+              }}
+            >
+              Выйти из сессии
+            </button>
           </div>
         </motion.div>
       </AnimatePresence>

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CaptureRoute from './CaptureRoute';
@@ -17,6 +17,14 @@ vi.mock('@shared/upload/outbox', () => ({
 }));
 
 describe('CaptureRoute', () => {
+  function LocationProbe() {
+    return (
+      <output data-testid="location">
+        {useLocation().pathname}
+        {useLocation().search}
+      </output>
+    );
+  }
   afterEach(() => cleanup());
   beforeEach(() => {
     vi.mocked(listPendingUploads).mockResolvedValue([]);
@@ -37,6 +45,7 @@ describe('CaptureRoute', () => {
     render(
       <MemoryRouter>
         <CaptureRoute />
+        <LocationProbe />
       </MemoryRouter>,
     );
     const camera = screen.getByLabelText('Снять страницу камерой');
@@ -65,6 +74,7 @@ describe('CaptureRoute', () => {
     render(
       <MemoryRouter>
         <CaptureRoute />
+        <LocationProbe />
       </MemoryRouter>,
     );
     const file = new File(['image'], 'tajik.png', { type: 'image/png' });
@@ -74,6 +84,9 @@ describe('CaptureRoute', () => {
     await waitFor(() => expect(savePendingUpload).toHaveBeenCalledOnce());
     await waitFor(() => expect(uploadDocument).toHaveBeenCalledOnce());
     await waitFor(() => expect(removePendingUpload).toHaveBeenCalledOnce());
-    expect(await screen.findByText('Страница безопасно сохранена')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/preparation?pageId=page'),
+    );
+    expect(screen.queryByText('Страница безопасно сохранена')).not.toBeInTheDocument();
   });
 });

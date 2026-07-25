@@ -30,8 +30,8 @@ class JobResult:
     state: str = "completed"
 
     def __post_init__(self) -> None:
-        if self.state not in {"completed", "partial"}:
-            raise ValueError("A handler result must be completed or partial")
+        if self.state not in {"completed", "partial", "awaiting_region_review"}:
+            raise ValueError("A handler result must be completed, partial, or awaiting_region_review")
 
 
 class JobContext:
@@ -59,6 +59,16 @@ class JobContext:
             processed_count=processed_count,
             total_count=total_count,
             outcome="partial" if partial else "completed",
+        )
+
+    def advance_progress(self, stage: str, *, processed_count: int, total_count: int) -> None:
+        self.checkpoint()
+        self.repository.advance_progress(
+            self.job.id,
+            self.worker_id,
+            stage,
+            processed_count=processed_count,
+            total_count=total_count,
         )
 
 
@@ -114,8 +124,11 @@ class WorkerService:
             if handler is None:
                 raise RetryableJobError("pipeline_not_available")
             result = self._run_handler_with_heartbeat(context, handler) or JobResult()
-            context.checkpoint()
-            self.repository.finish(job.id, self.worker_id, result.state)
+            if result.state == "awaiting_region_review":
+                self.repository.pause_for_region_review(job.id, self.worker_id)
+            else:
+                context.checkpoint()
+                self.repository.finish(job.id, self.worker_id, result.state)
         except JobCancelled:
             self.repository.finish(job.id, self.worker_id, "cancelled")
         except RetryableJobError as error:

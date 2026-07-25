@@ -34,13 +34,30 @@ export function AppShell() {
       </a>
       <header className={`site-header ${isAccessRoute ? 'site-header--access' : ''}`}>
         <Link className="brand" to="/">
-          <span className="brand__mark" aria-hidden="true"><span /></span>
-          <span>Tajik HTR <strong>Studio</strong></span>
+          <span className="brand__mark" aria-hidden="true">
+            <span />
+          </span>
+          <span>
+            Tajik HTR <strong>Studio</strong>
+          </span>
         </Link>
-        {!isAccessRoute && access.state === 'authenticated' ? <PrimaryNavigation onLogout={() => void access.logout()} /> : null}
+        {!isAccessRoute && access.state === 'authenticated' ? (
+          <PrimaryNavigation onLogout={() => void access.logout()} />
+        ) : null}
         <div className="header-actions">
-          <p className="status-label"><span className={`status-label__dot ${isOnline ? '' : 'status-label__dot--offline'}`} />{isOnline ? (access.state === 'authenticated' ? 'Сессия защищена' : 'Нет сессии') : 'Нет подключения'}</p>
-          {access.state === 'authenticated' ? <Button variant="quiet" onClick={() => void access.logout()}>Выйти</Button> : null}
+          <p className="status-label">
+            <span className={`status-label__dot ${isOnline ? '' : 'status-label__dot--offline'}`} />
+            {isOnline
+              ? access.state === 'authenticated'
+                ? 'Сессия защищена'
+                : 'Нет сессии'
+              : 'Нет подключения'}
+          </p>
+          {access.state === 'authenticated' ? (
+            <Button variant="quiet" onClick={() => void access.logout()}>
+              Выйти
+            </Button>
+          ) : null}
           <ThemeToggle />
         </div>
       </header>

@@ -42,6 +42,15 @@ def exif_oriented_jpeg() -> bytes:
     return output.getvalue()
 
 
+def transparent_handwriting_png() -> bytes:
+    image = Image.new("RGBA", (160, 80), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.line((25, 40, 130, 40), fill=(22, 22, 22, 255), width=7)
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     configured = replace(settings, database_path=tmp_path / "studio.sqlite3", storage_root=tmp_path / "assets")
@@ -49,7 +58,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as current:
         code, _ = current.app.state.access.issue_code("upload-tests")
-        exchange = current.post("/api/v1/access/exchange", json={"code": code})
+        exchange = current.post("/api/v1/access/exchange-code", json={"code": code})
         assert exchange.status_code == 200
         yield current, exchange.json()["csrf_token"], configured
 
@@ -144,10 +153,69 @@ def test_preprocessing_is_reproducible_immutable_and_preview_is_owned(client) ->
     cached = current.get(prepared.json()["prepared_asset"]["preview_url"] + "?max_edge=99999", headers={"If-None-Match": preview.headers["etag"]})
     assert cached.status_code == 304
     other_code, _ = current.app.state.access.issue_code("other-owner")
-    other_exchange = current.post("/api/v1/access/exchange", json={"code": other_code})
+    other_exchange = current.post("/api/v1/access/exchange-code", json={"code": other_code})
     assert other_exchange.status_code == 200
     isolated = current.get(prepared.json()["prepared_asset"]["preview_url"])
     assert isolated.status_code == 404 and isolated.json()["code"] == "asset_not_found"
+
+
+def test_preparation_state_confirmation_and_job_gate(client) -> None:
+    current, csrf, _ = client
+    created = upload(current, csrf, image_bytes(), key="preparation-confirm-key-01").json()
+    page_id = created["page_id"]
+    before = current.get(f"/api/v1/pages/{page_id}/preparation")
+    assert before.status_code == 200
+    assert before.json()["prepared_asset"] is None and before.json()["confirmed"] is False
+
+    prepared = current.post(
+        f"/api/v1/pages/{page_id}/prepare",
+        json={"rotation_degrees": 90},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert prepared.status_code == 200
+    state = current.get(f"/api/v1/pages/{page_id}/preparation")
+    assert state.status_code == 200
+    assert state.json()["recipe_hash"] == prepared.json()["recipe_hash"]
+    assert state.json()["confirmed"] is False
+
+    rejected = current.post(
+        f"/api/v1/pages/{page_id}/recognition-jobs",
+        json={},
+        headers={"X-CSRF-Token": csrf, "Idempotency-Key": "preparation-job-gate-0001"},
+    )
+    assert rejected.status_code == 409
+    assert rejected.json()["code"] == "page_preparation_not_confirmed"
+
+    stale = current.post(
+        f"/api/v1/pages/{page_id}/preparation/confirm",
+        json={"revision": state.json()["revision"] - 1},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert stale.status_code == 409 and stale.json()["code"] == "revision_conflict"
+    confirmed = current.post(
+        f"/api/v1/pages/{page_id}/preparation/confirm",
+        json={"revision": state.json()["revision"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json()["recipe_hash"] == prepared.json()["recipe_hash"]
+    final_state = current.get(f"/api/v1/pages/{page_id}/preparation")
+    assert final_state.json()["confirmed"] is True
+    created_job = current.post(
+        f"/api/v1/pages/{page_id}/recognition-jobs",
+        json={},
+        headers={"X-CSRF-Token": csrf, "Idempotency-Key": "preparation-job-gate-0002"},
+    )
+    assert created_job.status_code == 201
+
+    changed = current.post(
+        f"/api/v1/pages/{page_id}/prepare",
+        json={"rotation_degrees": 180},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert changed.status_code == 200
+    after_change = current.get(f"/api/v1/pages/{page_id}/preparation")
+    assert after_change.json()["confirmed"] is False
 
 
 def test_exif_orientation_is_applied_only_to_prepared_asset(client) -> None:
@@ -161,6 +229,26 @@ def test_exif_orientation_is_applied_only_to_prepared_asset(client) -> None:
     with current.app.state.database.connect() as connection:
         source_key = connection.execute("SELECT storage_key FROM assets WHERE id=?", (created["asset"]["id"],)).fetchone()[0]
     assert current.app.state.storage.resolve(source_key).read_bytes() == original
+
+
+def test_transparent_png_is_prepared_on_white_not_black_background(client) -> None:
+    current, csrf, _ = client
+    created = upload(current, csrf, transparent_handwriting_png(), key="transparent-paper-key-01").json()
+    prepared = current.post(
+        f"/api/v1/pages/{created['page_id']}/prepare",
+        json={"max_edge": 512},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert prepared.status_code == 200
+    with current.app.state.database.connect() as connection:
+        storage_key = connection.execute(
+            "SELECT storage_key FROM assets WHERE id=?",
+            (prepared.json()["prepared_asset"]["id"],),
+        ).fetchone()[0]
+    with Image.open(current.app.state.storage.resolve(storage_key)) as image:
+        assert image.mode == "RGB"
+        assert image.getpixel((0, 0)) == (255, 255, 255)
+        assert max(image.getpixel((80, 40))) < 80
 
 
 @pytest.mark.parametrize(

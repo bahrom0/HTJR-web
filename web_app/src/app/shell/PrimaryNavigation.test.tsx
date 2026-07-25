@@ -10,7 +10,11 @@ describe('responsive primary navigation', () => {
   it('exposes labeled destinations and session actions', () => {
     const onLogout = vi.fn();
     render(
-      <ThemeProvider><MemoryRouter><PrimaryNavigation onLogout={onLogout} /></MemoryRouter></ThemeProvider>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <PrimaryNavigation onLogout={onLogout} />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
     const menu = screen.getByRole('button', { name: 'Открыть основное меню' });
     expect(menu).toHaveAttribute('aria-expanded', 'false');

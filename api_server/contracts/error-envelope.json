@@ -1,0 +1,6 @@
+{
+  "code": "access_denied",
+  "message": "The access code or session is invalid.",
+  "retryable": false,
+  "request_id": "contract-test"
+}

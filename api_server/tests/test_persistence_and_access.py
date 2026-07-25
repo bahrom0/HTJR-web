@@ -136,14 +136,17 @@ def test_access_http_cookie_csrf_logout_and_release_flags(configured, monkeypatc
 
     monkeypatch.setattr(main_module, "settings", release_settings)
     with TestClient(main_module.create_app()) as client:
-        exchange = client.post("/api/v1/access/exchange", json={"code": code})
+        exchange = client.post("/api/v1/access/exchange-code", json={"code": code})
         assert exchange.status_code == 200
         cookie = exchange.headers["set-cookie"]
         assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=strict" in cookie
+        assert "Path=/" in cookie and "Path=/api/v1" not in cookie
         csrf_token = exchange.json()["csrf_token"]
         client.cookies.set(release_settings.cookie_name, exchange.cookies[release_settings.cookie_name])
         failed = client.post("/api/v1/access/logout", headers={"X-CSRF-Token": "wrong"})
         assert failed.status_code == 401
         logout = client.post("/api/v1/access/logout", headers={"X-CSRF-Token": csrf_token})
         assert logout.status_code == 204
-        assert "Max-Age=0" in logout.headers["set-cookie"]
+        deleted_cookie = logout.headers["set-cookie"]
+        assert "Max-Age=0" in deleted_cookie
+        assert "Path=/" in deleted_cookie and "Path=/api/v1" not in deleted_cookie

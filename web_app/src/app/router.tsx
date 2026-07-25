@@ -11,6 +11,9 @@ const OfflineRoute = lazy(() => import('@routes/offline/OfflineRoute'));
 const NotFoundRoute = lazy(() => import('@routes/not-found/NotFoundRoute'));
 const WorkspaceRoute = lazy(() => import('@routes/workspace/WorkspaceRoute'));
 const CaptureRoute = lazy(() => import('@routes/capture/CaptureRoute'));
+const PreparationRoute = lazy(() => import('@routes/preparation/PreparationRoute'));
+const RegionReviewRoute = lazy(() => import('@routes/regions/RegionReviewRoute'));
+const ResultRoute = lazy(() => import('@routes/result/ResultRoute'));
 
 function RouteFallback() {
   return <p role="status">Открываем раздел…</p>;
@@ -26,7 +29,6 @@ const workspaceRoutes = [
     'Подготовка изображения',
     'Подготовка станет доступна после безопасного импорта файла.',
   ],
-  ['/regions', 'Проверка регионов', 'Регионы появятся после реального CRAFT pipeline.'],
   ['/processing', 'Обработка', 'Таймлайн появится только с настоящими job events.'],
   ['/editor', 'Редактор', 'Редактор откроется после появления версионируемого текста.'],
   ['/review', 'Проверка мест', 'Проверка появится после explainable Tajik suggestions.'],
@@ -49,11 +51,22 @@ export const router = createBrowserRouter([
     children: [
       { path: '/access', element: lazyRoute(<AccessRoute />) },
       { path: '/offline', element: lazyRoute(<OfflineRoute />) },
-      { element: <AccessGuard />, children: [
-        { path: '/', element: lazyRoute(<HomeRoute />) },
-        { path: '/capture', element: lazyRoute(<CaptureRoute />) },
-        ...workspaceRoutes.map(([path, title, description]) => ({ path, element: lazyRoute(<WorkspaceRoute title={title} description={description} />) })),
-      ] },
+      {
+        element: <AccessGuard />,
+        children: [
+          { path: '/', element: lazyRoute(<HomeRoute />) },
+          { path: '/capture', element: lazyRoute(<CaptureRoute />) },
+          { path: '/preparation', element: lazyRoute(<PreparationRoute />) },
+          { path: '/regions', element: lazyRoute(<RegionReviewRoute />) },
+          { path: '/result', element: lazyRoute(<ResultRoute />) },
+          ...workspaceRoutes
+            .filter(([path]) => path !== '/preparation')
+            .map(([path, title, description]) => ({
+              path,
+              element: lazyRoute(<WorkspaceRoute title={title} description={description} />),
+            })),
+        ],
+      },
       { path: '*', element: lazyRoute(<NotFoundRoute />) },
     ],
   },

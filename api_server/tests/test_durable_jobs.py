@@ -37,7 +37,13 @@ def _seed(database: Database, *, owner: str = "owner-1", page_count: int = 1) ->
                 "INSERT INTO assets(id,owner_session_id,document_id,storage_key,sha256,byte_size,media_type,state,created_at,committed_at,kind,width,height,parent_asset_id) VALUES (?,?,?,?,?,1,'image/png','committed',?,?,'prepared',10,10,?)",
                 (prepared_id, owner, document_id, f"prepared-{page_id}", "b" * 64, now, now, source_id),
             )
-            connection.execute("INSERT INTO pages(id,document_id,source_asset_id,page_index,created_at,updated_at,prepared_asset_id) VALUES (?,?,?,?,?,?,?)", (page_id, document_id, source_id, index, now, now, prepared_id))
+            connection.execute(
+                """INSERT INTO pages(
+                       id,document_id,source_asset_id,page_index,created_at,updated_at,prepared_asset_id,
+                       preprocessing_recipe_hash,preparation_confirmed_recipe_hash)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (page_id, document_id, source_id, index, now, now, prepared_id, "a" * 64, "a" * 64),
+            )
             pages.append(page_id)
     return owner, pages
 
@@ -195,7 +201,7 @@ def test_job_api_enforces_csrf_idempotency_and_ownership(tmp_path: Path, monkeyp
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as client:
         code, _ = client.app.state.access.issue_code("owner-one")
-        exchange = client.post("/api/v1/access/exchange", json={"code": code})
+        exchange = client.post("/api/v1/access/exchange-code", json={"code": code})
         csrf = exchange.json()["csrf_token"]
         owner = client.app.state.access.authenticate(client.cookies.get(configured.cookie_name))["id"]
         _, pages = _seed(client.app.state.database, owner=owner, page_count=1)
@@ -209,7 +215,7 @@ def test_job_api_enforces_csrf_idempotency_and_ownership(tmp_path: Path, monkeyp
         job_id = created.json()["id"]
 
         other_code, _ = client.app.state.access.issue_code("owner-two")
-        other_exchange = client.post("/api/v1/access/exchange", json={"code": other_code})
+        other_exchange = client.post("/api/v1/access/exchange-code", json={"code": other_code})
         assert client.get(f"/api/v1/jobs/{job_id}").status_code == 404
         client.cookies.set(configured.cookie_name, exchange.cookies.get(configured.cookie_name))
         cancelled = client.post(f"/api/v1/jobs/{job_id}/cancel", headers={"X-CSRF-Token": csrf})

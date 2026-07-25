@@ -1,6 +1,19 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
-import { exchangeAccessCode, getAccessSession, logoutAccessSession, refreshCsrfToken } from '@shared/api/client';
+import {
+  exchangeAccessCode,
+  getAccessSession,
+  logoutAccessSession,
+  refreshCsrfToken,
+} from '@shared/api/client';
 
 type State = 'checking' | 'authenticated' | 'anonymous';
 type AccessContextValue = Readonly<{
@@ -46,7 +59,11 @@ export function AccessProvider({ children }: Readonly<{ children: ReactNode }>) 
       const timeout = window.setTimeout(() => setState('anonymous'), 0);
       return () => window.clearTimeout(timeout);
     }
-    const timeout = window.setTimeout(() => { setCsrfToken(null); setExpiresAt(null); setState('anonymous'); }, remaining);
+    const timeout = window.setTimeout(() => {
+      setCsrfToken(null);
+      setExpiresAt(null);
+      setState('anonymous');
+    }, remaining);
     return () => window.clearTimeout(timeout);
   }, [expiresAt]);
 
@@ -66,7 +83,10 @@ export function AccessProvider({ children }: Readonly<{ children: ReactNode }>) 
     setState('anonymous');
   }, [csrfToken]);
 
-  const value = useMemo(() => ({ state, expiresAt, csrfToken, exchange, logout, reconnect }), [state, expiresAt, csrfToken, exchange, logout, reconnect]);
+  const value = useMemo(
+    () => ({ state, expiresAt, csrfToken, exchange, logout, reconnect }),
+    [state, expiresAt, csrfToken, exchange, logout, reconnect],
+  );
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
 }
 

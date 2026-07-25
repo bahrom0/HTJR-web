@@ -9,6 +9,15 @@ android/
 android_app_instructions/
 docs/
 ops/
+!ops/
+ops/*
+!ops/local.ps1
+!ops/start-local.ps1
+!ops/stop-local.ps1
+!ops/status-local.ps1
+!ops/README.md
+!api_server/ops/
+!api_server/ops/**
 web_app_instructions/
 Датасет 1000 реал фотографии/
 
@@ -45,3 +54,6 @@ __pycache__/
 api_server/data/
 api_server/models/*
 !api_server/models/manifest.json
+!api_server/models/craft/
+api_server/models/craft/*
+!api_server/models/craft/manifest.json

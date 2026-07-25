@@ -12,32 +12,87 @@ export type ApiResult<T> =
   | { ok: false; error: ApiError };
 
 export type HealthLive = Readonly<{ status: 'ok'; requestId: string }>;
+export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export type RequestOptions = Readonly<{
+  method?: RequestMethod;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  json?: unknown;
+  body?: BodyInit | null;
+  headers?: Readonly<Record<string, string>>;
+  csrfToken?: string;
+}>;
 
 function createRequestId(): string {
   return crypto.randomUUID();
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isUuid(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+export function isIsoTimestamp(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
+}
+
 function isErrorEnvelope(
   value: unknown,
 ): value is { code: string; message: string; retryable: boolean; request_id: string } {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
   return (
-    typeof candidate.code === 'string' &&
-    typeof candidate.message === 'string' &&
-    typeof candidate.retryable === 'boolean' &&
-    typeof candidate.request_id === 'string'
+    typeof value.code === 'string' &&
+    typeof value.message === 'string' &&
+    typeof value.retryable === 'boolean' &&
+    typeof value.request_id === 'string'
   );
 }
 
 function normalizeError(value: unknown, requestId: string): ApiError {
-  if (isErrorEnvelope(value))
+  if (isErrorEnvelope(value)) {
     return {
       code: value.code,
       message: value.message,
       retryable: value.retryable,
       requestId: value.request_id,
     };
+  }
+  return {
+    code: 'invalid_error_response',
+    message: 'The server returned an invalid error response.',
+    retryable: false,
+    requestId,
+  };
+}
+
+function transportError(error: unknown, requestId: string, signal?: AbortSignal): ApiError {
+  if (signal?.aborted) {
+    return {
+      code: 'request_aborted',
+      message: 'The request was cancelled.',
+      retryable: true,
+      requestId,
+    };
+  }
+  if (error instanceof DOMException && error.name === 'TimeoutError') {
+    return {
+      code: 'request_timeout',
+      message: 'The server took too long to respond.',
+      retryable: true,
+      requestId,
+    };
+  }
   return {
     code: 'network_error',
     message: 'The server could not be reached.',
@@ -46,31 +101,54 @@ function normalizeError(value: unknown, requestId: string): ApiError {
   };
 }
 
+async function readJson(response: Response): Promise<unknown> {
+  if (response.status === 204 || response.headers.get('content-length') === '0') return null;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.toLowerCase().includes('application/json')) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function request<T>(
   path: string,
   parse: (value: unknown) => T | null,
-  signal?: AbortSignal,
-  init?: Readonly<{ method?: 'GET' | 'POST'; body?: unknown; csrfToken?: string }>,
+  options: RequestOptions = {},
 ): Promise<ApiResult<T>> {
   const requestId = createRequestId();
-  const timeout = AbortSignal.timeout(10_000);
-  const combinedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  if (options.json !== undefined && options.body !== undefined) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_request',
+        message: 'A request cannot contain both JSON and a raw body.',
+        retryable: false,
+        requestId,
+      },
+    };
+  }
+
+  const timeout = AbortSignal.timeout(options.timeoutMs ?? 10_000);
+  const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   try {
     const response = await fetch(`${environment.apiBaseUrl}${path}`, {
-      method: init?.method ?? 'GET',
+      method: options.method ?? 'GET',
       credentials: 'include',
       headers: {
         'X-Request-ID': requestId,
-        ...(init?.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        ...(init?.csrfToken ? { 'X-CSRF-Token': init.csrfToken } : {}),
+        ...(options.json === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(options.csrfToken ? { 'X-CSRF-Token': options.csrfToken } : {}),
+        ...options.headers,
       },
-      body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+      body: options.json !== undefined ? JSON.stringify(options.json) : (options.body ?? undefined),
       signal: combinedSignal,
     });
-    const body: unknown = response.status === 204 ? {} : await response.json();
+    const body = await readJson(response);
     if (!response.ok) return { ok: false, error: normalizeError(body, requestId) };
     const parsed = parse(body);
-    if (parsed === null)
+    if (parsed === null) {
       return {
         ok: false,
         error: {
@@ -80,50 +158,69 @@ export async function request<T>(
           requestId,
         },
       };
+    }
     return {
       ok: true,
       value: parsed,
       requestId: response.headers.get('X-Request-ID') ?? requestId,
     };
-  } catch {
-    return { ok: false, error: normalizeError(null, requestId) };
+  } catch (error) {
+    return { ok: false, error: transportError(error, requestId, options.signal) };
   }
 }
 
-export type AccessSession = Readonly<{ authenticated: true; expiresAt: string; csrfToken?: string }>;
+export type AccessSession = Readonly<{
+  authenticated: true;
+  expiresAt: string;
+  csrfToken?: string;
+}>;
 
-function parseAccessSession(value: unknown): AccessSession | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const item = value as Record<string, unknown>;
-  if (item.authenticated !== true || typeof item.expires_at !== 'string') return null;
-  if (item.csrf_token !== undefined && item.csrf_token !== null && typeof item.csrf_token !== 'string') return null;
-  return { authenticated: true, expiresAt: item.expires_at, ...(typeof item.csrf_token === 'string' ? { csrfToken: item.csrf_token } : {}) };
+export function parseAccessSession(value: unknown): AccessSession | null {
+  if (!isRecord(value)) return null;
+  if (value.authenticated !== true || !isIsoTimestamp(value.expires_at)) return null;
+  if (
+    value.csrf_token !== undefined &&
+    value.csrf_token !== null &&
+    typeof value.csrf_token !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    authenticated: true,
+    expiresAt: value.expires_at,
+    ...(typeof value.csrf_token === 'string' ? { csrfToken: value.csrf_token } : {}),
+  };
 }
 
 export function exchangeAccessCode(code: string): Promise<ApiResult<AccessSession>> {
-  return request('/access/exchange', parseAccessSession, undefined, { method: 'POST', body: { code } });
+  return request('/access/exchange-code', parseAccessSession, {
+    method: 'POST',
+    json: { code },
+  });
 }
 
 export function getAccessSession(signal?: AbortSignal): Promise<ApiResult<AccessSession>> {
-  return request('/access/session', parseAccessSession, signal);
+  return request('/access/session', parseAccessSession, { signal });
 }
 
 export function refreshCsrfToken(): Promise<ApiResult<AccessSession>> {
-  return request('/access/csrf', parseAccessSession, undefined, { method: 'POST' });
+  return request('/access/csrf', parseAccessSession, { method: 'POST' });
 }
 
 export async function logoutAccessSession(csrfToken: string): Promise<ApiResult<true>> {
-  return request('/access/logout', () => true, undefined, { method: 'POST', csrfToken });
+  return request('/access/logout', () => true, {
+    method: 'POST',
+    csrfToken,
+  });
 }
 
 export function parseHealthLive(value: unknown): HealthLive | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const candidate = value as Record<string, unknown>;
-  return candidate.status === 'ok' && typeof candidate.request_id === 'string'
-    ? { status: 'ok', requestId: candidate.request_id }
+  if (!isRecord(value)) return null;
+  return value.status === 'ok' && typeof value.request_id === 'string'
+    ? { status: 'ok', requestId: value.request_id }
     : null;
 }
 
 export function getLiveHealth(signal?: AbortSignal): Promise<ApiResult<HealthLive>> {
-  return request('/health/live', parseHealthLive, signal);
+  return request('/health/live', parseHealthLive, { signal });
 }

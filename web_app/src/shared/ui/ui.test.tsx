@@ -17,7 +17,7 @@ describe('Softly UI primitives', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Поле обязательно');
   });
 
-  it('uses keyboard-accessible tabs and lets Escape close a dialog', () => {
+  it('uses keyboard-accessible tabs and traps dialog focus until Escape closes it', () => {
     const onClose = vi.fn();
     render(
       <>
@@ -27,11 +27,18 @@ describe('Softly UI primitives', () => {
           items={[{ id: 'text', label: 'Текст', panel: 'Содержимое' }]}
         />
         <Dialog isOpen title="Подтверждение" onClose={onClose}>
-          Содержимое
+          <button type="button">Подтвердить</button>
         </Dialog>
       </>,
     );
     expect(screen.getByRole('tab', { name: 'Текст' })).toHaveAttribute('aria-selected', 'true');
+    const close = screen.getByRole('button', { name: 'Закрыть диалог' });
+    const confirm = screen.getByRole('button', { name: 'Подтвердить' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(confirm).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(close).toHaveFocus();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });

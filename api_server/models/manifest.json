@@ -1,1 +1,101 @@
-{"schema_version":1,"artifacts":[]}
+{
+  "schema_version": 1,
+  "source_manifest_sha256": "186cc4f900b02a418aca183b89cb40e719347de094c50c0083f718dd0f26d963",
+  "models": {
+    "trocr": {
+      "version": "trocr-base-tajik-v1",
+      "artifacts": [
+        {
+          "path": "trocr/config.json",
+          "size_bytes": 4897,
+          "sha256": "e08910cc0e0cfe661e6016336b852d118d935f10758e10cc5aab7a6c441165d4"
+        },
+        {
+          "path": "trocr/generation_config.json",
+          "size_bytes": 273,
+          "sha256": "64c9e414a49f4a15818f9a4b9d4f400b9f80cbbd0c284851b88eac53d46bc003"
+        },
+        {
+          "path": "trocr/merges.txt",
+          "size_bytes": 456318,
+          "sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5"
+        },
+        {
+          "path": "trocr/model.safetensors",
+          "size_bytes": 1335747032,
+          "sha256": "c40c95b9d99af59cfe1911c778430c4d369a63bab3eb059a005ba5b1c8d9cd19"
+        },
+        {
+          "path": "trocr/preprocessor_config.json",
+          "size_bytes": 364,
+          "sha256": "88f73800cf47a61709906414dba6970168d361c5103cc63fd2762bee63d0daf8"
+        },
+        {
+          "path": "trocr/special_tokens_map.json",
+          "size_bytes": 957,
+          "sha256": "8293ae960b0a0852d4d3813118030a1149a3ed9fe37bc2e1e7b3c2e62eb2d4b7"
+        },
+        {
+          "path": "trocr/tokenizer.json",
+          "size_bytes": 3558809,
+          "sha256": "dd6783fd244855ae8bdd72562fc7b93d61c97d6333c9bd4dd1dee46682d28c1f"
+        },
+        {
+          "path": "trocr/tokenizer_config.json",
+          "size_bytes": 1358,
+          "sha256": "1a2672bb02f0d63f34cbf1597f8da992113bc4f3b7c88d4ab353df9fa02e089b"
+        },
+        {
+          "path": "trocr/vocab.json",
+          "size_bytes": 798293,
+          "sha256": "ed19656ea1707df69134c4af35c8ceda2cc9860bf2c3495026153a133670ab5e"
+        }
+      ]
+    },
+    "tajik_rslora": {
+      "version": "tajik-rslora-v1",
+      "artifacts": [
+        {
+          "path": "tajik_rslora/adapter_config.json",
+          "size_bytes": 1076,
+          "sha256": "0e7e6b1ca495e8a51b01045d6e288761eb2010a0d5a2e81f825bbe56e129f995"
+        },
+        {
+          "path": "tajik_rslora/adapter_model.safetensors",
+          "size_bytes": 68154040,
+          "sha256": "099d9ed9beed11d2e2223a933e4b78a012cb1947036d4c7e363f6b828bcf5894"
+        },
+        {
+          "path": "tajik_rslora/config.json",
+          "size_bytes": 1779,
+          "sha256": "b8396b59ba3916eb5c55729ea44f9d56d34132e0db400dab2bff1b6e7f7dbac2"
+        },
+        {
+          "path": "tajik_rslora/generation_config.json",
+          "size_bytes": 273,
+          "sha256": "1ee4b3741f56f665514a723cbd009e6033bd842b2fcee0643f67f6d7a8e872e7"
+        },
+        {
+          "path": "tajik_rslora/preprocessor_config.json",
+          "size_bytes": 390,
+          "sha256": "96fd208e04b8eb30aace1a1d9188a82fdc0001281f4032788f8e357a52d1a847"
+        },
+        {
+          "path": "tajik_rslora/tokenizer.json",
+          "size_bytes": 3558642,
+          "sha256": "2bb1a22cfbe25b8e5a232b7fc4d7fc5073923b45724a5f813b00811bb6620f66"
+        },
+        {
+          "path": "tajik_rslora/tokenizer_config.json",
+          "size_bytes": 1388,
+          "sha256": "cf134cd8d02505c04767b808ea291a33bd109391d9693479aa8dd1b4521c12d7"
+        },
+        {
+          "path": "tajik_rslora/vocab.json",
+          "size_bytes": 798293,
+          "sha256": "ed19656ea1707df69134c4af35c8ceda2cc9860bf2c3495026153a133670ab5e"
+        }
+      ]
+    }
+  }
+}

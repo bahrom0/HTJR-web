@@ -1,0 +1,26 @@
+{$HTR_PUBLIC_ORIGIN:localhost} {
+	encode zstd gzip
+
+	handle /api/v1/* {
+		reverse_proxy {$HTR_API_UPSTREAM:127.0.0.1:8000}
+	}
+
+	handle /events/* {
+		reverse_proxy {$HTR_API_UPSTREAM:127.0.0.1:8000} {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		root * {$HTR_WEB_ROOT:./dist}
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		-X-Powered-By
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+	}
+}

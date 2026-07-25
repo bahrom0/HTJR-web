@@ -5,9 +5,11 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import router as api_router
+from app.api.events import router as events_router
 from app.core.errors import ApiError, ErrorEnvelope, api_error_handler
 from app.core.logging import configure_logging
 from app.core.database import Database
@@ -48,13 +50,33 @@ def create_app() -> FastAPI:
     async def handle_api_error(request: Request, error: ApiError) -> JSONResponse:
         return await api_error_handler(request, error)
 
+    @application.exception_handler(RequestValidationError)
+    async def handle_request_validation_error(request: Request, _error: RequestValidationError) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", "unknown")
+        payload = ErrorEnvelope(
+            code="request_validation_failed",
+            message="The request payload is invalid.",
+            retryable=False,
+            request_id=request_id,
+        )
+        return JSONResponse(status_code=422, content=payload.model_dump())
+
     @application.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, error: Exception) -> JSONResponse:
-        logger.exception("request_failed request_id=%s error_type=%s", request.state.request_id, type(error).__name__)
+        # Keep the response generic, but retain the traceback in the server
+        # log.  The previous error-level message only recorded the exception
+        # type, which made worker/API failures impossible to diagnose.  Do not
+        # log request bodies, cookies, image data, or recognized text.
+        logger.exception(
+            "request_failed request_id=%s error_type=%s",
+            request.state.request_id,
+            type(error).__name__,
+        )
         payload = ErrorEnvelope(code="internal_error", message="An internal error occurred.", retryable=False, request_id=request.state.request_id)
         return JSONResponse(status_code=500, content=payload.model_dump())
 
     application.include_router(api_router)
+    application.include_router(events_router)
     return application
 
 

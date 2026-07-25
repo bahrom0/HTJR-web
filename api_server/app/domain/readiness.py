@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.core.database import Database
 from app.core.settings import Settings
+from app.ml.craft import craft_status
+from app.ml.trocr_runtime import inspect_trocr_artifacts
 from app.repositories.jobs import JobRepository
 
 
@@ -22,3 +25,26 @@ class ReadinessService:
         if self._jobs.worker_is_fresh(stale_seconds=self._stale_seconds):
             return Readiness(is_ready=True, code="ready")
         return Readiness(is_ready=False, code="worker_unavailable")
+
+    def detector_check(self) -> Readiness:
+        worker = self.check()
+        if not worker.is_ready:
+            return worker
+        detector = craft_status()
+        if not detector.ready:
+            return Readiness(is_ready=False, code=detector.code)
+        if not self._jobs.model_is_ready("craft", stale_seconds=self._stale_seconds):
+            return Readiness(is_ready=False, code="craft_warmup_unavailable")
+        return Readiness(is_ready=True, code="ready")
+
+    def pipeline_check(self) -> Readiness:
+        detector = self.detector_check()
+        if not detector.is_ready:
+            return detector
+        models_root = Path(__file__).resolve().parents[2] / "models"
+        trocr = inspect_trocr_artifacts(models_root)
+        if not trocr.ready:
+            return Readiness(is_ready=False, code=trocr.code)
+        if not self._jobs.model_is_ready("trocr", stale_seconds=self._stale_seconds):
+            return Readiness(is_ready=False, code="trocr_warmup_unavailable")
+        return Readiness(is_ready=True, code="ready")

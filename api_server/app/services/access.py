@@ -104,14 +104,20 @@ class AccessService:
         if not token:
             raise AccessDenied()
         now = _now().isoformat()
-        with self.database.transaction() as connection:
+        # Authentication is on the hot path for every parallel UI request
+        # (regions, preparation, job polling, previews and SSE).  It only
+        # needs to validate the unexpired HttpOnly token.  Updating
+        # ``last_seen_at`` here turned every read into a SQLite write and made
+        # concurrent worker heartbeats surface as HTTP 500 ``database is
+        # locked`` errors.  Session expiry is authoritative in ``expires_at``;
+        # keep this path read-only so it cannot contend with ML job writes.
+        with self.database.connect() as connection:
             row = connection.execute(
                 "SELECT id,expires_at,csrf_hash FROM access_sessions WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?",
                 (_token_hash(token), now),
             ).fetchone()
             if row is None:
                 raise AccessDenied()
-            connection.execute("UPDATE access_sessions SET last_seen_at=? WHERE id=?", (now, row["id"]))
             return dict(row)
 
     def validate_csrf(self, session: dict, csrf_token: str | None) -> None:

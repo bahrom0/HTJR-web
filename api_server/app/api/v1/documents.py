@@ -93,6 +93,32 @@ class PreparationResponse(BaseModel):
     duplicate: bool = False
 
 
+class PagePreparationState(BaseModel):
+    document_id: str
+    page_id: str
+    revision: int
+    source_asset: AssetResponse
+    prepared_asset: AssetResponse | None = None
+    recipe: PreprocessRecipe | None = None
+    recipe_hash: str | None = None
+    quality_threshold_version: str | None = None
+    quality_metrics: dict[str, float | int] | None = None
+    quality_warnings: list[str] = Field(default_factory=list)
+    confirmed: bool = False
+
+
+class ConfirmPreparationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(ge=1)
+
+
+class ConfirmPreparationResponse(BaseModel):
+    page_id: str
+    revision: int
+    recipe_hash: str
+    confirmed_at: str
+
+
 def _safe_filename(raw: str | None) -> str | None:
     if not raw:
         return None
@@ -198,6 +224,106 @@ def _preparation_from_row(row, *, duplicate: bool) -> PreparationResponse:
     )
 
 
+@router.get("/pages/{page_id}/preparation", response_model=PagePreparationState)
+def get_page_preparation(
+    page_id: str,
+    request: Request,
+    session: AuthenticatedSession = Depends(require_session),
+) -> PagePreparationState:
+    with request.app.state.database.connect() as connection:
+        row = connection.execute(
+            """SELECT p.id page_id,p.document_id,p.revision,p.preprocessing_recipe_hash,
+                      p.preparation_confirmed_recipe_hash,
+                      source.id source_asset_id,source.media_type source_media_type,
+                      source.width source_width,source.height source_height,
+                      prepared.id prepared_asset_id,prepared.media_type prepared_media_type,
+                      prepared.width prepared_width,prepared.height prepared_height,
+                      pr.recipe_json,pr.recipe_hash,pr.quality_threshold_version,
+                      pr.quality_metrics_json,pr.quality_warnings_json
+               FROM pages p
+               JOIN documents d ON d.id=p.document_id
+               JOIN assets source ON source.id=p.source_asset_id AND source.state='committed'
+               LEFT JOIN assets prepared ON prepared.id=p.prepared_asset_id AND prepared.state='committed'
+               LEFT JOIN preprocessing_runs pr ON pr.prepared_asset_id=p.prepared_asset_id
+               WHERE p.id=? AND d.owner_session_id=? AND d.deleted_at IS NULL""",
+            (page_id, session.id),
+        ).fetchone()
+    if row is None:
+        raise ApiError(404, "page_not_found", "The page was not found.")
+
+    source_asset = AssetResponse(
+        id=row["source_asset_id"],
+        media_type=row["source_media_type"],
+        width=row["source_width"],
+        height=row["source_height"],
+        preview_url=f"/api/v1/assets/{row['source_asset_id']}/preview",
+    )
+    if row["prepared_asset_id"] is None or row["recipe_json"] is None:
+        return PagePreparationState(
+            document_id=row["document_id"],
+            page_id=row["page_id"],
+            revision=row["revision"],
+            source_asset=source_asset,
+        )
+
+    return PagePreparationState(
+        document_id=row["document_id"],
+        page_id=row["page_id"],
+        revision=row["revision"],
+        source_asset=source_asset,
+        prepared_asset=AssetResponse(
+            id=row["prepared_asset_id"],
+            media_type=row["prepared_media_type"],
+            width=row["prepared_width"],
+            height=row["prepared_height"],
+            preview_url=f"/api/v1/assets/{row['prepared_asset_id']}/preview",
+        ),
+        recipe=PreprocessRecipe.model_validate(json.loads(row["recipe_json"])),
+        recipe_hash=row["recipe_hash"],
+        quality_threshold_version=row["quality_threshold_version"],
+        quality_metrics=json.loads(row["quality_metrics_json"]),
+        quality_warnings=json.loads(row["quality_warnings_json"]),
+        confirmed=row["preparation_confirmed_recipe_hash"] == row["recipe_hash"],
+    )
+
+
+@router.post("/pages/{page_id}/preparation/confirm", response_model=ConfirmPreparationResponse)
+def confirm_page_preparation(
+    page_id: str,
+    payload: ConfirmPreparationRequest,
+    request: Request,
+    session: AuthenticatedSession = Depends(require_mutation_session),
+) -> ConfirmPreparationResponse:
+    now = datetime.now(UTC).isoformat()
+    with request.app.state.database.transaction(immediate=True) as connection:
+        page = connection.execute(
+            """SELECT p.revision,p.preprocessing_recipe_hash
+               FROM pages p JOIN documents d ON d.id=p.document_id
+               WHERE p.id=? AND d.owner_session_id=? AND d.deleted_at IS NULL""",
+            (page_id, session.id),
+        ).fetchone()
+        if page is None:
+            raise ApiError(404, "page_not_found", "The page was not found.")
+        if page["preprocessing_recipe_hash"] is None:
+            raise ApiError(409, "page_not_prepared", "Prepare the page before confirming it.")
+        if page["revision"] != payload.revision:
+            raise ApiError(409, "revision_conflict", "The page changed; refresh before confirming it.", True)
+        connection.execute(
+            """UPDATE pages
+               SET preparation_confirmed_recipe_hash=?,preparation_confirmed_at=?,
+                   revision=revision+1,updated_at=?
+               WHERE id=?""",
+            (page["preprocessing_recipe_hash"], now, now, page_id),
+        )
+        revision = page["revision"] + 1
+    return ConfirmPreparationResponse(
+        page_id=page_id,
+        revision=revision,
+        recipe_hash=page["preprocessing_recipe_hash"],
+        confirmed_at=now,
+    )
+
+
 @router.post("/pages/{page_id}/prepare", response_model=PreparationResponse)
 def prepare_page(page_id: str, recipe: PreprocessRecipe, request: Request, session: AuthenticatedSession = Depends(require_mutation_session)) -> PreparationResponse:
     with request.app.state.database.connect() as connection:
@@ -240,7 +366,12 @@ def prepare_page(page_id: str, recipe: PreprocessRecipe, request: Request, sessi
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (run_id, session.id, page_id, source["source_asset_id"], asset_id, PIPELINE_VERSION, recipe_json, digest, QUALITY_THRESHOLD_VERSION, json.dumps(metrics, sort_keys=True), json.dumps(warnings_out), now),
             )
-            connection.execute("UPDATE pages SET prepared_asset_id=?,preprocessing_recipe_hash=?,revision=revision+1,updated_at=? WHERE id=?", (asset_id, digest, now, page_id))
+            connection.execute(
+                "UPDATE pages SET prepared_asset_id=?,preprocessing_recipe_hash=?, "
+                "preparation_confirmed_recipe_hash=NULL,preparation_confirmed_at=NULL, "
+                "revision=revision+1,updated_at=? WHERE id=?",
+                (asset_id, digest, now, page_id),
+            )
     except sqlite3.IntegrityError:
         (request.app.state.storage.discard_committed if committed else request.app.state.storage.discard_temporary)(staged.storage_key)
         with request.app.state.database.connect() as connection:

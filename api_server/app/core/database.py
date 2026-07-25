@@ -3,7 +3,30 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+from types import TracebackType
 from typing import Iterator
+
+
+class _ClosingConnection(sqlite3.Connection):
+    """Close read-scoped SQLite handles when a ``with`` block exits.
+
+    ``sqlite3.Connection.__exit__`` commits or rolls back but deliberately
+    leaves the native handle open.  Repository reads consistently use
+    ``with database.connect()``, so preserving the standard behavior leaks
+    file handles until garbage collection and blocks temporary DB cleanup on
+    Windows.  The database boundary owns that lifecycle instead.
+    """
+
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        try:
+            return super().__exit__(exception_type, exception, traceback)
+        finally:
+            self.close()
 
 
 class Database:
@@ -13,7 +36,12 @@ class Database:
 
     def connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.path, timeout=5, isolation_level=None)
+        connection = sqlite3.connect(
+            self.path,
+            timeout=5,
+            isolation_level=None,
+            factory=_ClosingConnection,
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 5000")

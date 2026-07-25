@@ -111,10 +111,38 @@ def recipe_hash(source_sha256: str, recipe_json: str) -> str:
     return hashlib.sha256(material).hexdigest()
 
 
+def source_to_rgb(source: Image.Image) -> Image.Image:
+    """Apply orientation and place transparent pixels on a white paper background.
+
+    A direct Pillow ``convert('RGB')`` turns transparent PNG pixels black.
+    That is not the visual document the user selected and can make CRAFT
+    interpret an otherwise empty alpha channel as ink.  Prepared documents
+    are deliberately opaque RGB images, so the alpha compositing decision is
+    made once at the server-owned preparation boundary.
+    """
+    oriented = ImageOps.exif_transpose(source)
+    try:
+        has_alpha = oriented.mode in {"RGBA", "LA"} or (
+            oriented.mode == "P" and "transparency" in oriented.info
+        )
+        if not has_alpha:
+            return oriented.convert("RGB")
+        rgba = oriented.convert("RGBA")
+        background = Image.new("RGBA", rgba.size, "white")
+        try:
+            background.alpha_composite(rgba)
+            return background.convert("RGB")
+        finally:
+            rgba.close()
+            background.close()
+    finally:
+        oriented.close()
+
+
 def prepare_image(path: Path, recipe: dict[str, Any], *, server_max_edge: int) -> Image.Image:
     requested_max_edge = min(recipe["max_edge"], server_max_edge)
     with Image.open(path) as source:
-        image = ImageOps.exif_transpose(source).convert("RGB")
+        image = source_to_rgb(source)
     rotation = recipe["rotation_degrees"]
     if rotation:
         image = image.rotate(-rotation, expand=True, resample=Image.Resampling.BICUBIC)
@@ -152,14 +180,21 @@ def encode_prepared(image: Image.Image) -> bytes:
 
 
 def assess_quality(image: Image.Image) -> tuple[dict[str, float | int], list[str]]:
-    rgb = np.asarray(image, dtype=np.uint8)
-    gray = np.dot(rgb[..., :3], np.array([0.299, 0.587, 0.114])).astype(np.float32)
-    scale = min(1.0, 1600.0 / max(gray.shape))
+    # Quality statistics deliberately operate on a bounded grayscale sample.
+    # Materializing the original RGB image first made a large temporary float64
+    # array before the downscale happened, which could exhaust worker memory.
+    # Pillow's grayscale conversion uses the same standard luma coefficients as
+    # the previous RGB dot product, while float32 keeps all later calculations
+    # stable and bounded.
+    scale = min(1.0, 1600.0 / max(image.size))
+    sampled_image = image
     if scale < 1:
-        sampled_image = image.copy(); sampled_image.thumbnail((round(image.width * scale), round(image.height * scale)), Image.Resampling.BILINEAR)
-        sample = np.dot(np.asarray(sampled_image, dtype=np.float32)[..., :3], np.array([0.299, 0.587, 0.114]))
-    else:
-        sample = gray
+        sampled_image = image.copy()
+        sampled_image.thumbnail(
+            (round(image.width * scale), round(image.height * scale)),
+            Image.Resampling.BILINEAR,
+        )
+    sample = np.asarray(ImageOps.grayscale(sampled_image), dtype=np.float32)
     center = sample[1:-1, 1:-1]
     laplacian = sample[:-2, 1:-1] + sample[2:, 1:-1] + sample[1:-1, :-2] + sample[1:-1, 2:] - 4 * center
     laplacian_variance = float(laplacian.var()) if laplacian.size else 0.0

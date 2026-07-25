@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-import { uploadDocument, type UploadDocument } from '@features/capture/api';
+import { uploadDocument } from '@features/capture/api';
 import { preflightImage } from '@features/capture/preflight';
 import { useAccess } from '@shared/access/AccessProvider';
 import {
@@ -16,6 +16,7 @@ type Selection = Readonly<{ file: File; idempotencyKey: string }>;
 
 export default function CaptureRoute() {
   const { csrfToken, reconnect } = useAccess();
+  const navigate = useNavigate();
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -24,7 +25,6 @@ export default function CaptureRoute() {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [result, setResult] = useState<UploadDocument | null>(null);
   const firstPending = pending[0];
 
   useEffect(() => {
@@ -45,7 +45,6 @@ export default function CaptureRoute() {
   async function choose(file: File | undefined) {
     if (!file) return;
     setMessage(null);
-    setResult(null);
     const error = await preflightImage(file);
     if (error) {
       setSelection(null);
@@ -76,8 +75,10 @@ export default function CaptureRoute() {
         setPending((items) =>
           items.filter((item) => item.idempotencyKey !== upload.idempotencyKey),
         );
-        setResult(response.value);
         setSelection(null);
+        navigate(`/preparation?pageId=${encodeURIComponent(response.value.pageId)}`, {
+          replace: true,
+        });
       } else {
         if (!response.error.retryable) await removePendingUpload(upload.idempotencyKey);
         setMessage(response.error.message);
@@ -226,25 +227,6 @@ export default function CaptureRoute() {
           )}
         </aside>
       </div>
-      {result && (
-        <Card className="capture-success">
-          <div>
-            <p className="eyebrow">Документ создан</p>
-            <h2>Страница безопасно сохранена</h2>
-            <p>
-              {result.asset.width} × {result.asset.height} px. Теперь сервер может подготовить её
-              без изменения оригинала.
-            </p>
-          </div>
-          <img src={result.asset.previewUrl} alt="Защищённый предпросмотр загруженной страницы" />
-          <Link
-            className="ui-button ui-button--primary"
-            to={`/preparation?documentId=${result.documentId}&pageId=${result.pageId}`}
-          >
-            Перейти к подготовке
-          </Link>
-        </Card>
-      )}
     </main>
   );
 }

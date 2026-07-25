@@ -7,7 +7,9 @@ import { AccessProvider } from '@shared/access/AccessProvider';
 export function App() {
   return (
     <ThemeProvider>
-      <AccessProvider><RouterProvider router={router} /></AccessProvider>
+      <AccessProvider>
+        <RouterProvider router={router} />
+      </AccessProvider>
     </ThemeProvider>
   );
 }
