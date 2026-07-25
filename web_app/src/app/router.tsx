@@ -9,7 +9,6 @@ const AccessRoute = lazy(() => import('@routes/access/AccessRoute'));
 const HomeRoute = lazy(() => import('@routes/home/HomeRoute'));
 const OfflineRoute = lazy(() => import('@routes/offline/OfflineRoute'));
 const NotFoundRoute = lazy(() => import('@routes/not-found/NotFoundRoute'));
-const WorkspaceRoute = lazy(() => import('@routes/workspace/WorkspaceRoute'));
 const CaptureRoute = lazy(() => import('@routes/capture/CaptureRoute'));
 const PreparationRoute = lazy(() => import('@routes/preparation/PreparationRoute'));
 const RegionReviewRoute = lazy(() => import('@routes/regions/RegionReviewRoute'));
@@ -17,9 +16,11 @@ const ResultRoute = lazy(() => import('@routes/result/ResultRoute'));
 const ProcessingRoute = lazy(() => import('@routes/processing/ProcessingRoute'));
 const SettingsRoute = lazy(() => import('@routes/settings/SettingsRoute'));
 const DocumentsRoute = lazy(() => import('@routes/documents/DocumentsRoute'));
+const OrganizerRoute = lazy(() => import('@routes/organizer/OrganizerRoute'));
 const EditorRoute = lazy(() => import('@routes/editor/EditorRoute'));
 const ReviewRoute = lazy(() => import('@routes/review/ReviewRoute'));
 const ExportRoute = lazy(() => import('@routes/export/ExportRoute'));
+const DiagnosticsRoute = lazy(() => import('@routes/diagnostics/DiagnosticsRoute'));
 
 function RouteFallback() {
   return <p role="status">Открываем раздел…</p>;
@@ -28,20 +29,6 @@ function RouteFallback() {
 function lazyRoute(element: React.ReactNode) {
   return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
 }
-
-const workspaceRoutes = [
-  [
-    '/preparation',
-    'Подготовка изображения',
-    'Подготовка станет доступна после безопасного импорта файла.',
-  ],
-  ['/editor', 'Редактор', 'Редактор откроется после появления версионируемого текста.'],
-  ['/documents', 'Документы', 'Список появится после серверного хранилища документов.'],
-  ['/documents/:documentId', 'Документ', 'Детали доступны после document API.'],
-  ['/organizer', 'Страницы', 'Организатор появится вместе с multi-page document model.'],
-  ['/export', 'Экспорт', 'Экспорт будет доступен только для confirmed text.'],
-  ['/diagnostics', 'Диагностика', 'Диагностика покажет только безопасные runtime данные.'],
-] as const;
 
 export const router = createBrowserRouter([
   {
@@ -62,23 +49,11 @@ export const router = createBrowserRouter([
           { path: '/settings', element: lazyRoute(<SettingsRoute />) },
           { path: '/documents', element: lazyRoute(<DocumentsRoute />) },
           { path: '/documents/:documentId', element: lazyRoute(<DocumentsRoute />) },
+          { path: '/organizer', element: lazyRoute(<OrganizerRoute />) },
           { path: '/editor', element: lazyRoute(<EditorRoute />) },
           { path: '/review', element: lazyRoute(<ReviewRoute />) },
           { path: '/export', element: lazyRoute(<ExportRoute />) },
-          ...workspaceRoutes
-            .filter(
-              ([path]) =>
-                path !== '/preparation' &&
-                path !== '/documents' &&
-                path !== '/documents/:documentId' &&
-                path !== '/editor' &&
-                path !== '/review' &&
-                path !== '/export',
-            )
-            .map(([path, title, description]) => ({
-              path,
-              element: lazyRoute(<WorkspaceRoute title={title} description={description} />),
-            })),
+          { path: '/diagnostics', element: lazyRoute(<DiagnosticsRoute />) },
         ],
       },
       { path: '*', element: lazyRoute(<NotFoundRoute />) },

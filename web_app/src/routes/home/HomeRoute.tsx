@@ -118,14 +118,14 @@ export default function HomeRoute() {
           <div className="soft-icon">
             <Icon name="document" />
           </div>
-          <p className="eyebrow">Последние документы</p>
-          <h2>Здесь появится ваша работа</h2>
+          <p className="eyebrow">Архив документов</p>
+          <h2>Ваши рукописи и черновики</h2>
           <p>
-            Документы появятся после первой безопасной загрузки. Мы не подставляем демонстрационные
-            записи.
+            Перейдите в реестр сохранённых рукописей для продолжения работы, построчной корректуры и
+            экспорта.
           </p>
-          <Link to="/capture">
-            Подготовиться к загрузке <Icon name="arrow" />
+          <Link to="/documents">
+            Открыть документы <Icon name="arrow" />
           </Link>
         </Card>
         <Card className="privacy-card">

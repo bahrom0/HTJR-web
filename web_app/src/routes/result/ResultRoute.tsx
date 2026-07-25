@@ -133,13 +133,12 @@ export default function ResultRoute() {
           <aside className="result-sidebar">
             <Card>
               <p className="eyebrow">Следующий шаг</p>
-              <h2>Проверьте текст</h2>
+              <h2>Проверьте и отредактируйте текст</h2>
               <p>
-                Сверьте его с областями на снимке, прежде чем использовать или экспортировать
-                результат.
+                Перейдите в интерактивный редактор для проверки строк и автокоррекции букв.
               </p>
-              <Link className="ui-button ui-button--primary" to={regionLink}>
-                <Icon name="scan" /> Проверить области
+              <Link className="ui-button ui-button--primary" to={`/editor?jobId=${encodeURIComponent(jobId)}`}>
+                <Icon name="sparkles" /> Открыть в редакторе
               </Link>
             </Card>
             <Card>
