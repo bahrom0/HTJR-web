@@ -16,6 +16,7 @@ const RegionReviewRoute = lazy(() => import('@routes/regions/RegionReviewRoute')
 const ResultRoute = lazy(() => import('@routes/result/ResultRoute'));
 const ProcessingRoute = lazy(() => import('@routes/processing/ProcessingRoute'));
 const SettingsRoute = lazy(() => import('@routes/settings/SettingsRoute'));
+const DocumentsRoute = lazy(() => import('@routes/documents/DocumentsRoute'));
 
 function RouteFallback() {
   return <p role="status">Открываем раздел…</p>;
@@ -57,8 +58,15 @@ export const router = createBrowserRouter([
           { path: '/result', element: lazyRoute(<ResultRoute />) },
           { path: '/processing', element: lazyRoute(<ProcessingRoute />) },
           { path: '/settings', element: lazyRoute(<SettingsRoute />) },
+          { path: '/documents', element: lazyRoute(<DocumentsRoute />) },
+          { path: '/documents/:documentId', element: lazyRoute(<DocumentsRoute />) },
           ...workspaceRoutes
-            .filter(([path]) => path !== '/preparation')
+            .filter(
+              ([path]) =>
+                path !== '/preparation' &&
+                path !== '/documents' &&
+                path !== '/documents/:documentId',
+            )
             .map(([path, title, description]) => ({
               path,
               element: lazyRoute(<WorkspaceRoute title={title} description={description} />),
