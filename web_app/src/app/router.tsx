@@ -14,6 +14,8 @@ const CaptureRoute = lazy(() => import('@routes/capture/CaptureRoute'));
 const PreparationRoute = lazy(() => import('@routes/preparation/PreparationRoute'));
 const RegionReviewRoute = lazy(() => import('@routes/regions/RegionReviewRoute'));
 const ResultRoute = lazy(() => import('@routes/result/ResultRoute'));
+const ProcessingRoute = lazy(() => import('@routes/processing/ProcessingRoute'));
+const SettingsRoute = lazy(() => import('@routes/settings/SettingsRoute'));
 
 function RouteFallback() {
   return <p role="status">Открываем раздел…</p>;
@@ -29,18 +31,12 @@ const workspaceRoutes = [
     'Подготовка изображения',
     'Подготовка станет доступна после безопасного импорта файла.',
   ],
-  ['/processing', 'Обработка', 'Таймлайн появится только с настоящими job events.'],
   ['/editor', 'Редактор', 'Редактор откроется после появления версионируемого текста.'],
   ['/review', 'Проверка мест', 'Проверка появится после explainable Tajik suggestions.'],
   ['/documents', 'Документы', 'Список появится после серверного хранилища документов.'],
   ['/documents/:documentId', 'Документ', 'Детали доступны после document API.'],
   ['/organizer', 'Страницы', 'Организатор появится вместе с multi-page document model.'],
   ['/export', 'Экспорт', 'Экспорт будет доступен только для confirmed text.'],
-  [
-    '/settings',
-    'Настройки и приватность',
-    'Настройки появятся вместе с privacy и retention controls.',
-  ],
   ['/diagnostics', 'Диагностика', 'Диагностика покажет только безопасные runtime данные.'],
 ] as const;
 
@@ -59,6 +55,8 @@ export const router = createBrowserRouter([
           { path: '/preparation', element: lazyRoute(<PreparationRoute />) },
           { path: '/regions', element: lazyRoute(<RegionReviewRoute />) },
           { path: '/result', element: lazyRoute(<ResultRoute />) },
+          { path: '/processing', element: lazyRoute(<ProcessingRoute />) },
+          { path: '/settings', element: lazyRoute(<SettingsRoute />) },
           ...workspaceRoutes
             .filter(([path]) => path !== '/preparation')
             .map(([path, title, description]) => ({
