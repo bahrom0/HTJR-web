@@ -18,6 +18,7 @@ const ProcessingRoute = lazy(() => import('@routes/processing/ProcessingRoute'))
 const SettingsRoute = lazy(() => import('@routes/settings/SettingsRoute'));
 const DocumentsRoute = lazy(() => import('@routes/documents/DocumentsRoute'));
 const EditorRoute = lazy(() => import('@routes/editor/EditorRoute'));
+const ReviewRoute = lazy(() => import('@routes/review/ReviewRoute'));
 
 function RouteFallback() {
   return <p role="status">Открываем раздел…</p>;
@@ -34,7 +35,6 @@ const workspaceRoutes = [
     'Подготовка станет доступна после безопасного импорта файла.',
   ],
   ['/editor', 'Редактор', 'Редактор откроется после появления версионируемого текста.'],
-  ['/review', 'Проверка мест', 'Проверка появится после explainable Tajik suggestions.'],
   ['/documents', 'Документы', 'Список появится после серверного хранилища документов.'],
   ['/documents/:documentId', 'Документ', 'Детали доступны после document API.'],
   ['/organizer', 'Страницы', 'Организатор появится вместе с multi-page document model.'],
@@ -62,13 +62,15 @@ export const router = createBrowserRouter([
           { path: '/documents', element: lazyRoute(<DocumentsRoute />) },
           { path: '/documents/:documentId', element: lazyRoute(<DocumentsRoute />) },
           { path: '/editor', element: lazyRoute(<EditorRoute />) },
+          { path: '/review', element: lazyRoute(<ReviewRoute />) },
           ...workspaceRoutes
             .filter(
               ([path]) =>
                 path !== '/preparation' &&
                 path !== '/documents' &&
                 path !== '/documents/:documentId' &&
-                path !== '/editor',
+                path !== '/editor' &&
+                path !== '/review',
             )
             .map(([path, title, description]) => ({
               path,
