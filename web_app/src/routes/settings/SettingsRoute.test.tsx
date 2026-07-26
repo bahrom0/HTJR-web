@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ThemeProvider } from '@shared/theme';
 import SettingsRoute from './SettingsRoute';
@@ -50,8 +50,10 @@ describe('SettingsRoute', () => {
       </ThemeProvider>,
     );
 
-    const clearButton = screen.getByRole('button', { name: 'Очистить локальный кэш' });
-    fireEvent.click(clearButton);
+    const clearButton = screen.getAllByRole('button', { name: 'Очистить локальный кэш' })[0];
+    if (clearButton) {
+      fireEvent.click(clearButton);
+    }
 
     expect(localStorage.getItem('htr_draft_1')).toBeNull();
     expect(screen.getByText('Локальный кэш и черновики очищены.')).toBeInTheDocument();

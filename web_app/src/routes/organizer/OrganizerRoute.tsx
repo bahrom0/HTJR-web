@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Card, EmptyState, IconButton, Status } from '@shared/ui';
 
@@ -47,27 +47,23 @@ const INITIAL_PAGES: DocumentPageItem[] = [
   },
 ];
 
+function loadPages(): DocumentPageItem[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as DocumentPageItem[];
+    }
+  } catch {
+    // Invalid local drafts fall back to the initial projection.
+  }
+  return INITIAL_PAGES;
+}
+
 export default function OrganizerRoute() {
   const navigate = useNavigate();
-  const [pages, setPages] = useState<DocumentPageItem[]>([]);
+  const [pages, setPages] = useState<DocumentPageItem[]>(loadPages);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setPages(parsed);
-          return;
-        }
-      }
-    } catch {
-      // fallback
-    }
-    setPages(INITIAL_PAGES);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PAGES));
-  }, []);
 
   const savePages = (newPages: DocumentPageItem[]) => {
     const reindexed = newPages.map((page, idx) => ({
@@ -83,32 +79,36 @@ export default function OrganizerRoute() {
   };
 
   const moveUp = (index: number) => {
-    if (index <= 0) return;
+    if (index <= 0 || !pages[index] || !pages[index - 1]) return;
     const newPages = [...pages];
-    const temp = newPages[index - 1];
-    newPages[index - 1] = newPages[index];
-    newPages[index] = temp;
-    savePages(newPages);
-    showNotice(`Страница #${index + 1} перемещена на позицию #${index}`);
+    const prevItem = newPages[index - 1];
+    const currItem = newPages[index];
+    if (prevItem && currItem) {
+      newPages[index - 1] = currItem;
+      newPages[index] = prevItem;
+      savePages(newPages);
+      showNotice(`Страница #${index + 1} перемещена на позицию #${index}`);
+    }
   };
 
   const moveDown = (index: number) => {
-    if (index >= pages.length - 1) return;
+    if (index >= pages.length - 1 || !pages[index] || !pages[index + 1]) return;
     const newPages = [...pages];
-    const temp = newPages[index + 1];
-    newPages[index + 1] = newPages[index];
-    newPages[index] = temp;
-    savePages(newPages);
-    showNotice(`Страница #${index + 1} перемещена на позицию #${index + 2}`);
+    const nextItem = newPages[index + 1];
+    const currItem = newPages[index];
+    if (nextItem && currItem) {
+      newPages[index + 1] = currItem;
+      newPages[index] = nextItem;
+      savePages(newPages);
+      showNotice(`Страница #${index + 1} перемещена на позицию #${index + 2}`);
+    }
   };
 
   const handleRescan = (pageId: string, title: string) => {
     showNotice(`Запущено обновление страницы "${title}"...`);
     setPages((prev) =>
       prev.map((p) =>
-        p.id === pageId
-          ? { ...p, status: 'processing', updatedAt: new Date().toISOString() }
-          : p,
+        p.id === pageId ? { ...p, status: 'processing', updatedAt: new Date().toISOString() } : p,
       ),
     );
     setTimeout(() => {
@@ -120,7 +120,9 @@ export default function OrganizerRoute() {
         );
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        } catch {}
+        } catch {
+          // The completed state remains visible even if local persistence is unavailable.
+        }
         return updated;
       });
       showNotice(`Страница "${title}" успешно обновлена!`);
@@ -178,22 +180,14 @@ export default function OrganizerRoute() {
         <div>
           <p className="eyebrow">Мультистраничный документ</p>
           <h1>Организатор страниц</h1>
-          <p>
-            Управление порядком, статусами и составом страниц рукописного документа.
-          </p>
+          <p>Управление порядком, статусами и составом страниц рукописного документа.</p>
         </div>
 
         <div className="organizer-heading__actions">
-          <Button
-            variant="secondary"
-            onClick={() => navigate('/capture')}
-          >
+          <Button variant="secondary" onClick={() => navigate('/capture')}>
             ➕ Добавить страницу
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => navigate('/editor')}
-          >
+          <Button variant="primary" onClick={() => navigate('/editor')}>
             📝 Перейти к редактору
           </Button>
         </div>
@@ -265,13 +259,17 @@ export default function OrganizerRoute() {
               <div className="organizer-item__info">
                 <div className="organizer-item__title-row">
                   <h3 className="organizer-item__title">{page.title}</h3>
-                  <Status tone={getStatusTone(page.status)}>
-                    {getStatusLabel(page.status)}
-                  </Status>
+                  <Status tone={getStatusTone(page.status)}>{getStatusLabel(page.status)}</Status>
                 </div>
 
                 <div className="organizer-item__meta">
-                  <span>Обновлено: {new Date(page.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>
+                    Обновлено:{' '}
+                    {new Date(page.updatedAt).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
                   {page.charCount ? <span> • {page.charCount} символов</span> : null}
                 </div>
               </div>

@@ -195,7 +195,12 @@ def test_readiness_comes_from_persisted_worker_heartbeat(jobs) -> None:
 
 
 def test_job_api_enforces_csrf_idempotency_and_ownership(tmp_path: Path, monkeypatch) -> None:
-    configured = replace(settings, database_path=tmp_path / "api.sqlite3", storage_root=tmp_path / "assets")
+    configured = replace(
+        settings,
+        database_path=tmp_path / "api.sqlite3",
+        storage_root=tmp_path / "assets",
+        access_code_enabled=True,
+    )
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", configured)

@@ -1,28 +1,35 @@
 :root {
-  --canvas: #fdfcf8;
-  --surface: #fff;
-  --surface-soft: #f6f2eb;
-  --surface-raised: #fffdf9;
-  --surface-sage: #e8efe8;
-  --surface-lavender: #efedf4;
-  --surface-peach: #ffe4e1;
-  --accent: #ffb7b2;
-  --accent-hover: #f6a39e;
-  --accent-strong: #e98d88;
-  --text-primary: #292524;
-  --text-muted: #706862;
-  --text-subtle: #918984;
-  --border: #e7e2db;
-  --border-soft: color-mix(in srgb, var(--border) 60%, transparent);
+  --canvas: #e8ddd4;
+  --surface: #f5f0ea;
+  --surface-soft: #f1e8e1;
+  --surface-raised: #f8f4ef;
+  --surface-sage: #e7dfd8;
+  --surface-lavender: #e2d7ce;
+  --surface-peach: #d9c9bd;
+  --surface-glass: rgba(245, 240, 234, 0.72);
+  --surface-glass-strong: rgba(248, 244, 239, 0.86);
+  --accent: #171717;
+  --accent-hover: #2a2a2a;
+  --accent-strong: #050505;
+  --text-primary: #171615;
+  --text-muted: #6f6a66;
+  --text-subtle: #817a75;
+  --text-on-accent: #f5f3f1;
+  --border: #d2c5ba;
+  --border-soft: rgba(255, 255, 255, 0.42);
   --focus: #8b5cf6;
   --success: #477a5a;
   --warning: #a16207;
   --danger: #b74747;
   --info: #526d82;
   --scrim: rgba(41, 37, 36, 0.48);
-  --shadow-soft: 0 8px 30px -16px rgba(55, 44, 36, 0.2);
-  --shadow-raised: 0 20px 60px -32px rgba(55, 44, 36, 0.3);
-  --shadow-hover: 0 22px 58px -28px rgba(41, 37, 36, 0.38);
+  --shadow-soft: 0 24px 70px rgba(68, 53, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  --shadow-raised: 0 16px 48px rgba(52, 40, 31, 0.1);
+  --shadow-hover: 0 22px 64px rgba(23, 18, 15, 0.2);
+  --page-background:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.75), transparent 34%),
+    radial-gradient(circle at 86% 82%, rgba(194, 164, 143, 0.28), transparent 38%),
+    linear-gradient(145deg, #eee5de 0%, #e5d9cf 48%, #d9c9bd 100%);
   --font-product: 'Outfit Variable', 'Segoe UI', Arial, sans-serif;
   --font-accent: 'Reenie Beanie', cursive;
   --space-1: 4px;
@@ -54,42 +61,53 @@
   font-synthesis: none;
 }
 :root[data-theme='dark'] {
-  --canvas: #171715;
-  --surface: #232220;
-  --surface-soft: #2b2927;
-  --surface-raised: #272522;
-  --surface-sage: #27342c;
-  --surface-lavender: #302d3a;
-  --surface-peach: #3b2b2a;
-  --accent: #f09b96;
-  --accent-hover: #ffaea8;
-  --accent-strong: #ffc0bb;
-  --text-primary: #f7f3ed;
-  --text-muted: #c1b8af;
-  --text-subtle: #a69c93;
-  --border: #3b3834;
+  --canvas: #101010;
+  --surface: #202020;
+  --surface-soft: #171717;
+  --surface-raised: #2a2a2a;
+  --surface-sage: #242424;
+  --surface-lavender: #2c2c2c;
+  --surface-peach: #352f2b;
+  --surface-glass: rgba(30, 30, 30, 0.72);
+  --surface-glass-strong: rgba(40, 40, 40, 0.86);
+  --accent: #e0e0e0;
+  --accent-hover: #f5f3f1;
+  --accent-strong: #ffffff;
+  --text-primary: #f5f3f1;
+  --text-muted: #a9a5a2;
+  --text-subtle: #8c8885;
+  --text-on-accent: #101010;
+  --border: #393939;
+  --border-soft: rgba(255, 255, 255, 0.08);
   --focus: #c4b5fd;
   --success: #83b995;
   --warning: #e5b45f;
   --danger: #f08d8d;
   --info: #8fb1c7;
   --scrim: rgba(0, 0, 0, 0.62);
-  --shadow-soft: 0 12px 32px -18px rgba(0, 0, 0, 0.7);
-  --shadow-raised: 0 28px 70px -34px rgba(0, 0, 0, 0.9);
-  --shadow-hover: 0 24px 56px -28px rgba(0, 0, 0, 0.9);
+  --shadow-soft: 0 24px 70px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-raised: 0 16px 48px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 22px 64px rgba(0, 0, 0, 0.4);
+  --page-background:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.05), transparent 34%),
+    radial-gradient(circle at 86% 82%, rgba(194, 164, 143, 0.05), transparent 38%),
+    linear-gradient(145deg, #151515 0%, #101010 48%, #0a0a0a 100%);
 }
 * {
   box-sizing: border-box;
 }
 html {
-  background: var(--canvas);
+  background: var(--page-background);
+  background-color: var(--canvas);
   scroll-behavior: smooth;
 }
 body {
   min-width: 320px;
   min-height: 100dvh;
   margin: 0;
-  background: var(--canvas);
+  background: var(--page-background);
+  background-attachment: fixed;
+  background-color: var(--canvas);
   color: var(--text-primary);
 }
 button,
@@ -178,7 +196,7 @@ main {
   margin-bottom: var(--space-10);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  background: var(--surface-glass);
   box-shadow: var(--shadow-soft);
   padding: var(--space-2) var(--space-3);
   backdrop-filter: blur(24px) saturate(1.2);
@@ -211,7 +229,7 @@ main {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--text-primary);
+  background: var(--text-on-accent);
 }
 .header-actions {
   grid-column: 3;
@@ -316,7 +334,7 @@ main {
 }
 .theme-toggle__menu button[aria-selected='true'] {
   background: var(--accent);
-  color: #292524;
+  color: var(--text-on-accent);
 }
 .primary-navigation {
   display: flex;
@@ -352,7 +370,7 @@ main {
 }
 .primary-navigation__main a:hover,
 .primary-navigation__main a[aria-current='page'] {
-  background: var(--surface-lavender);
+  background: var(--surface-glass-strong);
   color: var(--text-primary);
 }
 .primary-navigation__main a:active {
@@ -360,12 +378,12 @@ main {
 }
 .primary-navigation__main .primary-navigation__cta {
   background: var(--accent);
-  color: #292524;
+  color: var(--text-on-accent);
   font-weight: 650;
 }
 .primary-navigation__main .primary-navigation__cta:hover {
   background: var(--accent-hover);
-  color: #292524;
+  color: var(--text-on-accent);
 }
 .primary-navigation__mobile-tools {
   display: none;
@@ -430,7 +448,7 @@ main:focus-visible {
 }
 .ui-button--primary {
   background: var(--accent);
-  color: #292524;
+  color: var(--text-on-accent);
   box-shadow: 0 9px 24px -14px var(--accent-strong);
 }
 .ui-button--primary:hover:not(:disabled) {
@@ -670,6 +688,20 @@ main:focus-visible {
 }
 .ui-state--offline {
   box-shadow: inset 0 0 0 1px var(--info);
+}
+.ui-state--partial {
+  box-shadow: inset 0 0 0 1px var(--warning);
+}
+.ui-state__skeletons {
+  display: grid;
+  gap: var(--space-2);
+  width: min(100%, 32rem);
+}
+.ui-state__skeletons .ui-skeleton:nth-child(2) {
+  width: 82%;
+}
+.ui-state__skeletons .ui-skeleton:nth-child(3) {
+  width: 58%;
 }
 .ui-toast-region {
   position: fixed;
@@ -1036,8 +1068,8 @@ main:focus-visible {
   margin-block: var(--space-8);
 }
 .access-form input {
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
 }
 .access-form .ui-button {
   width: 100%;
@@ -1045,6 +1077,38 @@ main:focus-visible {
 .access-form-card > .ui-button--quiet {
   margin-top: calc(var(--space-5) * -1);
   margin-bottom: var(--space-5);
+}
+.access-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3) var(--space-6);
+  margin-top: var(--space-6);
+}
+.access-links a {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-underline-offset: 0.25em;
+}
+.access-links a:hover,
+.access-links a:focus-visible {
+  color: var(--text);
+}
+.access-legacy {
+  margin-top: var(--space-8);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-5);
+  color: var(--text-muted);
+}
+.access-legacy summary {
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.access-legacy .access-form {
+  margin-bottom: 0;
 }
 .shell-page {
   display: grid;
@@ -2404,7 +2468,9 @@ main:focus-visible {
   padding: var(--space-1) var(--space-4);
   font-size: 0.85rem;
   font-weight: 500;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .settings-segmented__btn:hover {
@@ -2438,7 +2504,9 @@ main:focus-visible {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface-soft);
-  transition: background-color 200ms ease, border-color 200ms ease;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
 }
 
 .settings-toggle__slider::before {
@@ -2450,7 +2518,9 @@ main:focus-visible {
   bottom: 3px;
   border-radius: 50%;
   background: var(--text-muted);
-  transition: transform 200ms ease, background-color 200ms ease;
+  transition:
+    transform 200ms ease,
+    background-color 200ms ease;
 }
 
 .settings-toggle input:checked + .settings-toggle__slider {
@@ -2473,7 +2543,9 @@ main:focus-visible {
   font-size: 0.9rem;
   font-weight: 500;
   outline: none;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 .settings-select:hover,
@@ -2528,7 +2600,6 @@ main:focus-visible {
     justify-content: flex-start;
   }
 }
-
 
 /* ================= Processing Route ================= */
 .processing-page {
@@ -2674,7 +2745,7 @@ main:focus-visible {
 
 .processing-step-card--active .processing-step-icon {
   background: var(--accent);
-  color: #292524;
+  color: var(--text-on-accent);
 }
 
 .processing-step-content {
@@ -2761,7 +2832,7 @@ main:focus-visible {
 
 .documents-tab--active {
   background: var(--accent);
-  color: #292524;
+  color: var(--text-on-accent);
   font-weight: 650;
 }
 
@@ -2831,7 +2902,9 @@ main:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .document-card:hover {
@@ -2854,7 +2927,9 @@ main:focus-visible {
   padding: var(--space-1);
   border-radius: 50%;
   line-height: 1;
-  transition: color 160ms ease, transform 160ms ease;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .favorite-button:hover {
@@ -2984,6 +3059,7 @@ main:focus-visible {
   .documents-view-toggle {
     align-self: flex-start;
   }
+}
 
 /* ================= Editor Route ================= */
 
@@ -3048,7 +3124,9 @@ main:focus-visible {
   font-size: 1.1rem;
   line-height: 1.8;
   resize: vertical;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .editor-full-textarea:focus {
@@ -3318,7 +3396,9 @@ main:focus-visible {
   flex-direction: column;
   gap: var(--space-3);
   border: 1px solid var(--border-soft);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .editor-line-card:hover {
@@ -3506,7 +3586,10 @@ main:focus-visible {
   font-size: 1.2rem;
   font-weight: 600;
   box-shadow: var(--shadow-soft);
-  transition: transform 120ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 120ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .tajik-panel__char-btn:hover {
@@ -3693,7 +3776,9 @@ main:focus-visible {
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-4);
   outline: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .review-word-input:focus {
@@ -3725,7 +3810,7 @@ main:focus-visible {
 
 .review-highlight {
   background: var(--accent);
-  color: #292524;
+  color: var(--text-on-accent);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   font-weight: 700;
@@ -3889,7 +3974,11 @@ main:focus-visible {
 
 .export-success-card {
   border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
-  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-sage) 60%, var(--surface)), var(--surface));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-sage) 60%, var(--surface)),
+    var(--surface)
+  );
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
@@ -3985,7 +4074,9 @@ main:focus-visible {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background: var(--surface-soft);
-  transition: border-color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .export-format-item:hover:not(.export-format-item--disabled) {
@@ -4043,7 +4134,9 @@ main:focus-visible {
   border: 1px solid var(--border-soft);
   background: var(--surface-soft);
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .export-checkbox-option:hover {
@@ -4246,7 +4339,9 @@ main:focus-visible {
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-soft);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .organizer-item:hover {
@@ -4518,4 +4613,3 @@ main:focus-visible {
   font-family: monospace;
   font-size: 0.8rem;
 }
-

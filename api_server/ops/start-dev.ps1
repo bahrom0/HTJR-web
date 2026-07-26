@@ -13,6 +13,24 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Repair-ProcessPathEnvironment {
+    $pathKeys = @(
+        [Environment]::GetEnvironmentVariables().Keys |
+            Where-Object { [String]::Equals([string]$_, 'Path', [StringComparison]::OrdinalIgnoreCase) }
+    )
+    if ($pathKeys.Count -le 1) {
+        return
+    }
+
+    $pathValue = [Environment]::GetEnvironmentVariable('Path', 'Process')
+    foreach ($pathKey in $pathKeys) {
+        [Environment]::SetEnvironmentVariable([string]$pathKey, $null, 'Process')
+    }
+    [Environment]::SetEnvironmentVariable('Path', $pathValue, 'Process')
+}
+
+Repair-ProcessPathEnvironment
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stateDirectory = Join-Path $projectRoot 'data\.runtime'
 $statePath = Join-Path $stateDirectory 'dev-processes.json'
@@ -147,13 +165,17 @@ if ($Action -eq 'Stop') {
 if ($Action -eq 'Status') {
     $state = Read-LauncherState
     if ($null -eq $state) {
-        Write-Output 'Tajik HTR Studio dev processes are not running.'
+        Write-Output '[--] API: stopped'
+        Write-Output '[--] Worker: stopped'
         exit 1
     }
     $apiRunning = Test-TrackedProcess -ProcessId ([int]$state.api_pid) -ExpectedInterpreter ([string]$state.python)
     $workerRunning = Test-TrackedProcess -ProcessId ([int]$state.worker_pid) -ExpectedInterpreter ([string]$state.python)
-    $isReady = $apiRunning -and $workerRunning -and (Test-ApiReadiness -ApiPort ([int]$state.port)) -and (Test-WorkerReadiness -Interpreter ([string]$state.python))
-    Write-Output $(if ($isReady) { 'Tajik HTR Studio dev processes are ready.' } else { 'Tajik HTR Studio dev processes are not ready.' })
+    $apiReady = $apiRunning -and (Test-ApiReadiness -ApiPort ([int]$state.port))
+    $workerReady = $workerRunning -and (Test-WorkerReadiness -Interpreter ([string]$state.python))
+    $isReady = $apiReady -and $workerReady
+    Write-Output $(if ($apiReady) { "[OK] API: ready (PID $($state.api_pid))" } else { '[--] API: not ready' })
+    Write-Output $(if ($workerReady) { "[OK] Worker: ready (PID $($state.worker_pid))" } else { '[--] Worker: not ready' })
     exit $(if ($isReady) { 0 } else { 1 })
 }
 

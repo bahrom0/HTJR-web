@@ -65,23 +65,23 @@ export default function SettingsRoute() {
   const [clearStatus, setClearStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {
-      // storage error fallback
-    }
-
     if (settings.highContrast) {
       document.documentElement.dataset.highContrast = 'true';
     } else {
       delete document.documentElement.dataset.highContrast;
     }
     document.documentElement.dataset.fontSize = settings.fontSize;
-    setStorageSize(calculateStorageUsage());
   }, [settings]);
 
   const updateSetting = <K extends keyof HtrSettings>(key: K, value: HtrSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+    const nextSettings = { ...settings, [key]: value };
+    setSettings(nextSettings);
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(nextSettings));
+      setStorageSize(calculateStorageUsage());
+    } catch {
+      // The in-memory preference remains active when browser storage is unavailable.
+    }
   };
 
   const handleClearCache = () => {
@@ -181,7 +181,9 @@ export default function SettingsRoute() {
 
               <div className="settings-item">
                 <div className="settings-item__info">
-                  <span className="settings-item__label">Высокая контрастность</span>
+                  <label htmlFor="high-contrast-toggle" className="settings-item__label">
+                    Высокая контрастность
+                  </label>
                   <span className="settings-item__hint">
                     Повышенная четкость границ и графических элементов
                   </span>
@@ -359,9 +361,7 @@ export default function SettingsRoute() {
                   <Button type="button" className="ui-button--secondary" onClick={handleClearCache}>
                     Очистить локальный кэш
                   </Button>
-                  {clearStatus ? (
-                    <Status tone="success">{clearStatus}</Status>
-                  ) : null}
+                  {clearStatus ? <Status tone="success">{clearStatus}</Status> : null}
                 </div>
               </div>
             </div>
@@ -410,11 +410,13 @@ export default function SettingsRoute() {
 
               <div className="settings-item settings-item--vertical">
                 <div className="settings-item__info">
-                  <span className="settings-item__label">Конфиденциальность и локальная обработка</span>
+                  <span className="settings-item__label">
+                    Конфиденциальность и локальная обработка
+                  </span>
                   <p className="settings-privacy-text">
                     Все изображения, макеты страниц и распознанный текст обрабатываются локально на
-                    вашем сервере или устройстве. Ваши конфиденциальные данные и рукописные документы не
-                    передаются сторонним облачным сервисам.
+                    вашем сервере или устройстве. Ваши конфиденциальные данные и рукописные
+                    документы не передаются сторонним облачным сервисам.
                   </p>
                 </div>
               </div>

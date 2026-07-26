@@ -35,6 +35,11 @@ class Settings:
     line_crop_padding: float
     trocr_num_beams: int
     trocr_max_new_tokens: int
+    access_code_enabled: bool
+    email_verification_ttl_seconds: int
+    password_reset_ttl_seconds: int
+    account_attempt_limit: int
+    account_attempt_window_seconds: int
 
 
 def read_settings(source: dict[str, str] | None = None) -> Settings:
@@ -106,6 +111,11 @@ def read_settings(source: dict[str, str] | None = None) -> Settings:
         line_crop_padding,
         trocr_num_beams,
         trocr_max_new_tokens,
+        values.get("HTR_ACCESS_CODE_ENABLED", "false").lower() == "true",
+        int(values.get("HTR_EMAIL_VERIFICATION_TTL_SECONDS", "1800")),
+        int(values.get("HTR_PASSWORD_RESET_TTL_SECONDS", "1800")),
+        int(values.get("HTR_ACCOUNT_ATTEMPT_LIMIT", "5")),
+        int(values.get("HTR_ACCOUNT_ATTEMPT_WINDOW_SECONDS", "900")),
     )
 
 

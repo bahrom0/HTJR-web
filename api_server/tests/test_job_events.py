@@ -244,6 +244,7 @@ def test_sse_resume_ownership_and_restart(tmp_path: Path, monkeypatch) -> None:
         settings,
         database_path=tmp_path / "api-events.sqlite3",
         storage_root=tmp_path / "assets",
+        access_code_enabled=True,
         sse_heartbeat_seconds=0.05,
         sse_poll_seconds=0.01,
     )
@@ -343,7 +344,12 @@ def test_sse_heartbeat_then_disconnect_has_no_background_task(tmp_path: Path) ->
 
 
 def test_expired_access_cannot_open_sse(tmp_path: Path, monkeypatch) -> None:
-    configured = replace(settings, database_path=tmp_path / "expired.sqlite3", storage_root=tmp_path / "assets")
+    configured = replace(
+        settings,
+        database_path=tmp_path / "expired.sqlite3",
+        storage_root=tmp_path / "assets",
+        access_code_enabled=True,
+    )
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", configured)

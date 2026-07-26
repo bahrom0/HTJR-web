@@ -7,7 +7,7 @@ import {
   saveEditorState,
   type LineBlock,
 } from '@features/editor';
-import { Badge, Button, Card, Icon, Status, Tabs, type TabItem } from '@shared/ui';
+import { Badge, Button, Card, Icon, Status, Tabs } from '@shared/ui';
 
 export default function EditorRoute() {
   const [searchParams] = useSearchParams();
@@ -49,6 +49,7 @@ export default function EditorRoute() {
   const handleUndo = useCallback(() => {
     if (past.length === 0) return;
     const previous = past[past.length - 1];
+    if (!previous) return;
     const newPast = past.slice(0, past.length - 1);
     setFuture((f) => [blocks, ...f]);
     setBlocks(previous);
@@ -59,6 +60,7 @@ export default function EditorRoute() {
   const handleRedo = useCallback(() => {
     if (future.length === 0) return;
     const next = future[0];
+    if (!next) return;
     const newFuture = future.slice(1);
     setPast((p) => [...p, blocks]);
     setBlocks(next);
@@ -167,7 +169,7 @@ export default function EditorRoute() {
   const exportUrl = `/export${querySuffix}`;
 
   // Tab items setup
-  const tabItems: TabItem[] = [
+  const tabItems = [
     {
       id: 'text-only',
       label: 'Только текст',
@@ -224,7 +226,7 @@ export default function EditorRoute() {
           {/* Left panel: Original Page Preview */}
           <div className="editor-split-left">
             <div className="editor-split-panel-header">
-              <Icon name="file" />
+              <Icon name="document" />
               <span>Оригинал рукописи</span>
             </div>
             <div className="editor-document-preview">
@@ -267,7 +269,7 @@ export default function EditorRoute() {
           {/* Right panel: Editor */}
           <div className="editor-split-right">
             <div className="editor-split-panel-header">
-              <Icon name="edit" />
+              <Icon name="scan" />
               <span>Редактор строк</span>
             </div>
             <div className="editor-split-lines-list">

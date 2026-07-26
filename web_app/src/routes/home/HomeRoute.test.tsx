@@ -31,7 +31,7 @@ describe('normalized home', () => {
       screen.getByRole('heading', { name: 'Превратите снимок страницы в проверенный документ.' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Четыре понятных этапа' })).toBeInTheDocument();
-    expect(screen.getByText(/Мы не подставляем демонстрационные записи/)).toBeInTheDocument();
+    expect(screen.getByText(/Ваши рукописи и черновики/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Начать с изображения/ })).toHaveAttribute(
       'href',
       '/capture',

@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: "Manrope", "Geist", "Inter", sans-serif;
+  
+  --color-page: var(--page-bg);
+  --color-page-soft: var(--page-bg-soft);
+  --color-glass: var(--surface-glass);
+  --color-glass-strong: var(--surface-glass-strong);
+  --color-dark: var(--surface-dark);
+  --color-dark-soft: var(--surface-dark-soft);
+  
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-on-dark: var(--text-on-dark);
+  
+  --color-border-light: var(--border-light);
+  --color-border-dark: var(--border-dark);
+  
+  --radius-xs: 14px;
+  --radius-sm: 18px;
+  --radius-md: 24px;
+  --radius-lg: 32px;
+  --radius-xl: 40px;
+  --radius-pill: 999px;
+  
+  --shadow-soft: var(--shadow-soft);
+  --shadow-card: var(--shadow-card);
+  --shadow-control: var(--shadow-control);
+}
+
+@layer base {
+  :root {
+    --page-bg: #e8ddd4;
+    --page-bg-soft: #f1e8e1;
+
+    --surface-glass: rgba(245, 240, 234, 0.72);
+    --surface-glass-strong: rgba(248, 244, 239, 0.86);
+
+    --surface-dark: #171717;
+    --surface-dark-soft: #202020;
+
+    --text-primary: #171615;
+    --text-secondary: #6f6a66;
+    --text-muted: #96908b;
+    --text-on-dark: #f5f3f1;
+
+    --border-light: rgba(255, 255, 255, 0.42);
+    --border-dark: rgba(23, 22, 21, 0.10);
+
+    --shadow-soft: 0 24px 70px rgba(68, 53, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+    --shadow-card: 0 16px 48px rgba(52, 40, 31, 0.10);
+    --shadow-control: 0 8px 24px rgba(48, 38, 30, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    --shadow-dark: 0 22px 64px rgba(23, 18, 15, 0.20);
+
+    --bg-image: radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.75), transparent 34%), 
+                radial-gradient(circle at 86% 82%, rgba(194, 164, 143, 0.28), transparent 38%), 
+                linear-gradient(145deg, #eee5de 0%, #e5d9cf 48%, #d9c9bd 100%);
+  }
+
+  .dark {
+    --page-bg: #101010;
+    --page-bg-soft: #171717;
+
+    --surface-glass: rgba(30, 30, 30, 0.72);
+    --surface-glass-strong: rgba(40, 40, 40, 0.86);
+
+    --surface-dark: #202020;
+    --surface-dark-soft: #2a2a2a;
+
+    --text-primary: #f5f3f1;
+    --text-secondary: #a9a5a2;
+    --text-muted: #6f6a66;
+    --text-on-dark: #f5f3f1;
+
+    --border-light: rgba(255, 255, 255, 0.08);
+    --border-dark: rgba(255, 255, 255, 0.15);
+
+    --shadow-soft: 0 24px 70px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card: 0 16px 48px rgba(0, 0, 0, 0.2);
+    --shadow-control: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    --shadow-dark: 0 22px 64px rgba(0, 0, 0, 0.40);
+
+    --bg-image: radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.05), transparent 34%), 
+                radial-gradient(circle at 86% 82%, rgba(194, 164, 143, 0.05), transparent 38%), 
+                linear-gradient(145deg, #151515 0%, #101010 48%, #0a0a0a 100%);
+  }
+
+  body {
+    background: var(--bg-image);
+    background-color: var(--page-bg);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .glass-surface {
+    background: var(--surface-glass);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(28px) saturate(115%);
+    -webkit-backdrop-filter: blur(28px) saturate(115%);
+  }
+
+  .dark-surface {
+    background: var(--surface-dark);
+    color: var(--text-on-dark);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--shadow-dark);
+  }
+
+  .control {
+    min-height: 58px;
+    padding: 0 20px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.48);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-control);
+    color: var(--text-primary);
+    backdrop-filter: blur(16px);
+    transition: all 220ms ease;
+  }
+
+  .dark .control {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .control:focus-visible {
+    outline: none;
+    border-color: rgba(23, 22, 21, 0.22);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.32), 0 10px 28px rgba(48, 38, 30, 0.08);
+  }
+
+  .dark .control:focus-visible {
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1), 0 10px 28px rgba(0, 0, 0, 0.2);
+  }
+
+  .button-primary {
+    min-height: 54px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--surface-dark);
+    color: var(--text-on-dark);
+    font-weight: 500;
+    box-shadow: 0 12px 28px rgba(23, 18, 15, 0.18);
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1), box-shadow 220ms ease, background-color 220ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dark .button-primary {
+    background: #e0e0e0;
+    color: #101010;
+  }
+
+  .button-primary:hover {
+    transform: translateY(-2px) scale(1.01);
+  }
+
+  .button-secondary {
+    min-height: 52px;
+    padding: 0 22px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.48);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    backdrop-filter: blur(16px);
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1), background-color 220ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dark .button-secondary {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .button-secondary:hover {
+    transform: translateY(-2px) scale(1.01);
+    background: rgba(255, 255, 255, 0.58);
+  }
+
+  .dark .button-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .navigation {
+    background: rgba(245, 240, 234, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 12px 36px rgba(58, 45, 35, 0.08);
+  }
+
+  .dark .navigation {
+    background: rgba(30, 30, 30, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

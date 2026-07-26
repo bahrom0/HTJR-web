@@ -59,7 +59,8 @@ export const PROCESSING_STEPS: readonly PipelineStep[] = [
 function getActiveStepIndex(stage: JobStage | undefined): number {
   if (!stage) return 0;
   for (let i = 0; i < PROCESSING_STEPS.length; i++) {
-    if ((PROCESSING_STEPS[i].stages as readonly string[]).includes(stage)) {
+    const step = PROCESSING_STEPS[i];
+    if (step && (step.stages as readonly string[]).includes(stage)) {
       return i;
     }
   }
@@ -109,7 +110,7 @@ export default function ProcessingRoute() {
   const [mockSnapshot, setMockSnapshot] = useState<JobSnapshot | null>(
     jobId ? null : createInitialMockSnapshot(),
   );
-  const [mockIndex, setMockIndex] = useState(0);
+  const [, setMockIndex] = useState(0);
   const [isCanceling, setIsCanceling] = useState(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
@@ -138,11 +139,11 @@ export default function ProcessingRoute() {
     const interval = window.setInterval(() => {
       setMockIndex((current) => {
         const nextIndex = current + 1;
-        if (nextIndex >= MOCK_TIMELINE.length) {
+        const step = MOCK_TIMELINE[nextIndex];
+        if (nextIndex >= MOCK_TIMELINE.length || !step) {
           window.clearInterval(interval);
           return current;
         }
-        const step = MOCK_TIMELINE[nextIndex];
         const isDone = step.stage === 'completed';
         setMockSnapshot({
           id: 'demo-job-123',
@@ -184,7 +185,6 @@ export default function ProcessingRoute() {
 
     const isFinished =
       activeSnapshot.state === 'completed' ||
-      activeSnapshot.state === 'ready_for_review' ||
       activeSnapshot.stage === 'completed' ||
       activeSnapshot.stage === 'ready_for_review';
 
@@ -320,7 +320,6 @@ export default function ProcessingRoute() {
           {PROCESSING_STEPS.map((step, index) => {
             const isDone = isCompletedState || index < activeStepIndex;
             const isActive = !isCompletedState && index === activeStepIndex;
-            const isPending = !isCompletedState && index > activeStepIndex;
 
             let cardStateClass = 'processing-step-card--pending';
             if (isDone) cardStateClass = 'processing-step-card--completed';

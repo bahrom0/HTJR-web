@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { loadEditorState, saveEditorState, type LineBlock } from '@features/editor';
 import { TajikPanel } from '@features/tajik-panel';
-import { Badge, Button, Card, Icon, Status } from '@shared/ui';
+import { Badge, Button, Card, Icon } from '@shared/ui';
 
 export interface Suggestion {
   id: string;

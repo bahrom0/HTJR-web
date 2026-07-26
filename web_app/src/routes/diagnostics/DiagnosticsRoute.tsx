@@ -84,7 +84,9 @@ export default function DiagnosticsRoute() {
           return;
         }
       }
-    } catch {}
+    } catch {
+      // Invalid queue data is treated as an empty recoverable queue.
+    }
     setOfflineQueueCount(0);
   }, []);
 
@@ -119,7 +121,9 @@ export default function DiagnosticsRoute() {
         if (estimate.usage) {
           idbFormatted = `${(estimate.usage / (1024 * 1024)).toFixed(2)} MB`;
         }
-      } catch {}
+      } catch {
+        // Storage estimation is optional; keep the explicit fallback value.
+      }
     }
 
     setStorageInfo({
@@ -131,9 +135,12 @@ export default function DiagnosticsRoute() {
   }, []);
 
   useEffect(() => {
-    checkServerHealth();
-    updateOfflineQueue();
-    updateStorageMetrics();
+    const initialCheck = window.setTimeout(() => {
+      void checkServerHealth();
+      updateOfflineQueue();
+      void updateStorageMetrics();
+    }, 0);
+    return () => window.clearTimeout(initialCheck);
   }, [checkServerHealth, updateOfflineQueue, updateStorageMetrics]);
 
   // 5. Clear local cache
@@ -169,14 +176,12 @@ export default function DiagnosticsRoute() {
           <p className="eyebrow">Системный мониторинг</p>
           <h1>Диагностика системы</h1>
           <p>
-            Проверка работоспособности сервера, состояния офлайн-очереди и использования локальной памяти.
+            Проверка работоспособности сервера, состояния офлайн-очереди и использования локальной
+            памяти.
           </p>
         </div>
 
-        <Button
-          variant="secondary"
-          onClick={checkServerHealth}
-        >
+        <Button variant="secondary" onClick={checkServerHealth}>
           🔄 Обновить диагностику
         </Button>
       </header>
@@ -258,10 +263,7 @@ export default function DiagnosticsRoute() {
               </div>
             </div>
             <div className="diagnostics-action-row">
-              <Button
-                variant="danger"
-                onClick={handleClearCache}
-              >
+              <Button variant="danger" onClick={handleClearCache}>
                 🗑 Очистить локальный кэш
               </Button>
             </div>

@@ -20,7 +20,12 @@ def _image_bytes() -> bytes:
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    configured = replace(settings, database_path=tmp_path / "studio.sqlite3", storage_root=tmp_path / "assets")
+    configured = replace(
+        settings,
+        database_path=tmp_path / "studio.sqlite3",
+        storage_root=tmp_path / "assets",
+        access_code_enabled=True,
+    )
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", configured)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
@@ -7,7 +7,7 @@ import {
   toggleFavoriteDocument,
   type DocumentItem,
 } from '@entities/document';
-import { Button, Card, Dialog, EmptyState, Field, Icon, IconButton, Status } from '@shared/ui';
+import { Button, Card, Dialog, EmptyState, Field, IconButton, Status } from '@shared/ui';
 
 type TabKey = 'all' | 'recent' | 'drafts' | 'favorites';
 type ViewMode = 'grid' | 'list';
@@ -20,14 +20,10 @@ export default function DocumentsRoute() {
 
   const activeDocId = routeDocId || searchDocId;
 
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>(getDocuments);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-
-  useEffect(() => {
-    setDocuments(getDocuments());
-  }, []);
 
   const handleToggleFavorite = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -65,9 +61,7 @@ export default function DocumentsRoute() {
 
     // Filter by tab
     if (activeTab === 'recent') {
-      result.sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      );
+      result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     } else if (activeTab === 'drafts') {
       result = result.filter((doc) => doc.status === 'draft');
     } else if (activeTab === 'favorites') {
@@ -128,9 +122,7 @@ export default function DocumentsRoute() {
         <div>
           <p className="eyebrow">Архив и управление</p>
           <h1>Документы Tajik HTR</h1>
-          <p>
-            Список всех ваших распознанных и обрабатываемых рукописных документов.
-          </p>
+          <p>Список всех ваших распознанных и обрабатываемых рукописных документов.</p>
         </div>
         <Link className="ui-button ui-button--primary" to="/capture">
           + Распознать текст
@@ -228,9 +220,7 @@ export default function DocumentsRoute() {
           {filteredDocuments.map((doc) => (
             <Card key={doc.id} className="document-card">
               <div className="document-card__header">
-                <Status tone={getStatusTone(doc.status)}>
-                  {getStatusLabel(doc.status)}
-                </Status>
+                <Status tone={getStatusTone(doc.status)}>{getStatusLabel(doc.status)}</Status>
                 <button
                   type="button"
                   className={`favorite-button ${doc.isFavorite ? 'favorite-button--active' : ''}`}
@@ -259,11 +249,10 @@ export default function DocumentsRoute() {
 
               <div className="document-card__meta">
                 <span className="document-meta-item">
-                  📄 {doc.pageCount} {doc.pageCount === 1 ? 'страница' : doc.pageCount < 5 ? 'страницы' : 'страниц'}
+                  📄 {doc.pageCount}{' '}
+                  {doc.pageCount === 1 ? 'страница' : doc.pageCount < 5 ? 'страницы' : 'страниц'}
                 </span>
-                <span className="document-meta-item">
-                  📅 {formatDate(doc.updatedAt)}
-                </span>
+                <span className="document-meta-item">📅 {formatDate(doc.updatedAt)}</span>
               </div>
 
               <div className="document-card__actions">
@@ -308,9 +297,15 @@ export default function DocumentsRoute() {
             </div>
 
             <div className="document-modal-details">
-              <p><strong>Количество страниц:</strong> {selectedDocument.pageCount}</p>
-              <p><strong>Дата создания:</strong> {formatDate(selectedDocument.createdAt)}</p>
-              <p><strong>Последнее изменение:</strong> {formatDate(selectedDocument.updatedAt)}</p>
+              <p>
+                <strong>Количество страниц:</strong> {selectedDocument.pageCount}
+              </p>
+              <p>
+                <strong>Дата создания:</strong> {formatDate(selectedDocument.createdAt)}
+              </p>
+              <p>
+                <strong>Последнее изменение:</strong> {formatDate(selectedDocument.updatedAt)}
+              </p>
             </div>
 
             {selectedDocument.rawText || selectedDocument.previewText ? (
@@ -330,10 +325,7 @@ export default function DocumentsRoute() {
               >
                 Открыть в редакторе
               </Link>
-              <Button
-                variant="danger"
-                onClick={() => handleDelete(selectedDocument.id)}
-              >
+              <Button variant="danger" onClick={() => handleDelete(selectedDocument.id)}>
                 Удалить
               </Button>
               <Button variant="quiet" onClick={closeModal}>

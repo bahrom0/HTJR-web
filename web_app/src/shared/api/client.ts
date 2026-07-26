@@ -173,11 +173,44 @@ export type AccessSession = Readonly<{
   authenticated: true;
   expiresAt: string;
   csrfToken?: string;
+  authMethod: 'account' | 'access_code';
+  user?: AccountProfile;
 }>;
+
+export type AccountProfile = Readonly<{
+  id: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+function parseAccountProfile(value: unknown): AccountProfile | null {
+  if (!isRecord(value)) return null;
+  if (
+    !isUuid(value.id) ||
+    typeof value.email !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.email_verified !== 'boolean' ||
+    !isIsoTimestamp(value.created_at) ||
+    !isIsoTimestamp(value.updated_at)
+  )
+    return null;
+  return {
+    id: value.id,
+    email: value.email,
+    name: value.name,
+    emailVerified: value.email_verified,
+    createdAt: value.created_at,
+    updatedAt: value.updated_at,
+  };
+}
 
 export function parseAccessSession(value: unknown): AccessSession | null {
   if (!isRecord(value)) return null;
   if (value.authenticated !== true || !isIsoTimestamp(value.expires_at)) return null;
+  if (value.auth_method !== 'account' && value.auth_method !== 'access_code') return null;
   if (
     value.csrf_token !== undefined &&
     value.csrf_token !== null &&
@@ -185,10 +218,15 @@ export function parseAccessSession(value: unknown): AccessSession | null {
   ) {
     return null;
   }
+  const user =
+    value.user === undefined || value.user === null ? undefined : parseAccountProfile(value.user);
+  if (value.auth_method === 'account' && !user) return null;
   return {
     authenticated: true,
     expiresAt: value.expires_at,
+    authMethod: value.auth_method,
     ...(typeof value.csrf_token === 'string' ? { csrfToken: value.csrf_token } : {}),
+    ...(user ? { user } : {}),
   };
 }
 
@@ -211,6 +249,113 @@ export async function logoutAccessSession(csrfToken: string): Promise<ApiResult<
   return request('/access/logout', () => true, {
     method: 'POST',
     csrfToken,
+  });
+}
+
+type CodeResponse = Readonly<{
+  accepted: true;
+  developmentCode?: string;
+  expiresAt?: string;
+}>;
+
+function parseCodeResponse(value: unknown): CodeResponse | null {
+  if (!isRecord(value) || value.accepted !== true) return null;
+  if (
+    value.development_code !== undefined &&
+    value.development_code !== null &&
+    typeof value.development_code !== 'string'
+  )
+    return null;
+  if (
+    value.expires_at !== undefined &&
+    value.expires_at !== null &&
+    !isIsoTimestamp(value.expires_at)
+  )
+    return null;
+  return {
+    accepted: true,
+    ...(typeof value.development_code === 'string'
+      ? { developmentCode: value.development_code }
+      : {}),
+    ...(typeof value.expires_at === 'string' ? { expiresAt: value.expires_at } : {}),
+  };
+}
+
+export type RegistrationResponse = Readonly<{
+  email: string;
+  verificationExpiresAt: string;
+  developmentCode?: string;
+}>;
+
+function parseRegistration(value: unknown): RegistrationResponse | null {
+  if (
+    !isRecord(value) ||
+    typeof value.email !== 'string' ||
+    !isIsoTimestamp(value.verification_expires_at)
+  )
+    return null;
+  if (
+    value.development_code !== undefined &&
+    value.development_code !== null &&
+    typeof value.development_code !== 'string'
+  )
+    return null;
+  return {
+    email: value.email,
+    verificationExpiresAt: value.verification_expires_at,
+    ...(typeof value.development_code === 'string'
+      ? { developmentCode: value.development_code }
+      : {}),
+  };
+}
+
+export function registerAccount(
+  email: string,
+  name: string,
+  password: string,
+): Promise<ApiResult<RegistrationResponse>> {
+  return request('/access/register', parseRegistration, {
+    method: 'POST',
+    json: { email, name, password },
+  });
+}
+
+export function loginAccount(email: string, password: string): Promise<ApiResult<AccessSession>> {
+  return request('/access/login', parseAccessSession, {
+    method: 'POST',
+    json: { email, password },
+  });
+}
+
+export function verifyAccountEmail(email: string, code: string): Promise<ApiResult<CodeResponse>> {
+  return request('/access/email/verify', parseCodeResponse, {
+    method: 'POST',
+    json: { email, code },
+  });
+}
+
+export function resendAccountVerification(email: string): Promise<ApiResult<CodeResponse>> {
+  return request('/access/email/resend', parseCodeResponse, {
+    method: 'POST',
+    json: { email },
+  });
+}
+
+export function requestPasswordRecovery(email: string): Promise<ApiResult<CodeResponse>> {
+  return request('/access/recovery/request', parseCodeResponse, {
+    method: 'POST',
+    json: { email },
+  });
+}
+
+export function confirmPasswordRecovery(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<ApiResult<CodeResponse>> {
+  return request('/access/recovery/confirm', parseCodeResponse, {
+    method: 'POST',
+    json: { email, code, new_password: newPassword },
   });
 }
 

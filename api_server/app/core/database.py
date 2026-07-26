@@ -68,7 +68,19 @@ class Database:
                 "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
             )
             applied = {row[0] for row in connection.execute("SELECT version FROM schema_migrations")}
-            for migration in sorted(self.migrations_dir.glob("[0-9]*_*.sql")):
+            migrations = sorted(self.migrations_dir.glob("[0-9]*_*.sql"))
+            pending = [migration for migration in migrations if migration.name not in applied]
+            if applied and pending:
+                backup_path = self.path.with_name(
+                    f"{self.path.name}.backup-before-{pending[0].stem}"
+                )
+                if not backup_path.exists():
+                    backup = sqlite3.connect(backup_path)
+                    try:
+                        connection.backup(backup)
+                    finally:
+                        backup.close()
+            for migration in migrations:
                 if migration.name in applied:
                     continue
                 version = migration.name.replace("'", "''")

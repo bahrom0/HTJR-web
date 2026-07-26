@@ -23,6 +23,7 @@ def configured(tmp_path):
         storage_root=tmp_path / "assets",
         access_attempt_limit=2,
         access_attempt_window_seconds=300,
+        access_code_enabled=True,
     )
     database = Database(configured_settings.database_path)
     database.migrate()

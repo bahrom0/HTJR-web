@@ -32,6 +32,15 @@
       "AccessSession": {
         "additionalProperties": false,
         "properties": {
+          "auth_method": {
+            "default": "access_code",
+            "enum": [
+              "account",
+              "access_code"
+            ],
+            "title": "Auth Method",
+            "type": "string"
+          },
           "authenticated": {
             "const": true,
             "default": true,
@@ -54,12 +63,213 @@
             "format": "date-time",
             "title": "Expires At",
             "type": "string"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountProfile"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
           "expires_at"
         ],
         "title": "AccessSession",
+        "type": "object"
+      },
+      "AccountLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "AccountLoginRequest",
+        "type": "object"
+      },
+      "AccountProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "email_verified",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AccountProfile",
+        "type": "object"
+      },
+      "AccountRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 12,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "password"
+        ],
+        "title": "AccountRegisterRequest",
+        "type": "object"
+      },
+      "AccountRegistrationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "development_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Development Code"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "verification_expires_at": {
+            "format": "date-time",
+            "title": "Verification Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "verification_expires_at"
+        ],
+        "title": "AccountRegistrationResponse",
+        "type": "object"
+      },
+      "AccountSessionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "user_agent": {
+            "title": "User Agent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "expires_at",
+          "last_seen_at",
+          "user_agent",
+          "current"
+        ],
+        "title": "AccountSessionItem",
+        "type": "object"
+      },
+      "AccountSessionList": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AccountSessionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AccountSessionList",
         "type": "object"
       },
       "ApiErrorEnvelope": {
@@ -487,6 +697,45 @@
         "title": "DocumentPatch",
         "type": "object"
       },
+      "EmailCodeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ],
+        "title": "EmailCodeRequest",
+        "type": "object"
+      },
+      "EmailOnlyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "EmailOnlyRequest",
+        "type": "object"
+      },
       "ExportArtifact": {
         "additionalProperties": false,
         "properties": {
@@ -579,6 +828,42 @@
           "idempotency_key"
         ],
         "title": "ExportCreate",
+        "type": "object"
+      },
+      "GenericAcceptedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "const": true,
+            "default": true,
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "development_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Development Code"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "title": "GenericAcceptedResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -940,6 +1225,36 @@
         "title": "PagePreparationState",
         "type": "object"
       },
+      "PasswordResetConfirmRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 128,
+            "minLength": 12,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "code",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirmRequest",
+        "type": "object"
+      },
       "Point": {
         "additionalProperties": false,
         "properties": {
@@ -1088,6 +1403,22 @@
           }
         },
         "title": "PreprocessRecipe",
+        "type": "object"
+      },
+      "ProfilePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProfilePatch",
         "type": "object"
       },
       "RecognitionJob": {
@@ -1254,6 +1585,42 @@
           "revision"
         ],
         "title": "RecognitionRegion",
+        "type": "object"
+      },
+      "RecognitionResultResponse": {
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "is_partial": {
+            "title": "Is Partial",
+            "type": "boolean"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "page_id": {
+            "format": "uuid",
+            "title": "Page Id",
+            "type": "string"
+          },
+          "raw_text": {
+            "title": "Raw Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "document_id",
+          "page_id",
+          "raw_text",
+          "is_partial"
+        ],
+        "title": "RecognitionResultResponse",
         "type": "object"
       },
       "RegionCreate": {
@@ -1577,6 +1944,21 @@
         "title": "ReplaceRegionsRequest",
         "type": "object"
       },
+      "RevokeSessionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked_count": {
+            "minimum": 0.0,
+            "title": "Revoked Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked_count"
+        ],
+        "title": "RevokeSessionsResponse",
+        "type": "object"
+      },
       "TextLine": {
         "additionalProperties": false,
         "properties": {
@@ -1816,6 +2198,92 @@
         "x-implementation-status": "live"
       }
     },
+    "/api/v1/access/email/resend": {
+      "post": {
+        "operationId": "livePostApiV1AccessEmailResendV1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailOnlyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericAcceptedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Resend Email",
+        "tags": [
+          "access"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/access/email/verify": {
+      "post": {
+        "operationId": "livePostApiV1AccessEmailVerifyV1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericAcceptedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Verify Email",
+        "tags": [
+          "access"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
     "/api/v1/access/exchange-code": {
       "post": {
         "operationId": "livePostApiV1AccessExchangeCodeV1",
@@ -1848,6 +2316,49 @@
           }
         },
         "summary": "Exchange",
+        "tags": [
+          "access"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/access/login": {
+      "post": {
+        "operationId": "livePostApiV1AccessLoginV1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Login",
         "tags": [
           "access"
         ],
@@ -1892,6 +2403,135 @@
           }
         ],
         "summary": "Logout",
+        "tags": [
+          "access"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/access/recovery/confirm": {
+      "post": {
+        "operationId": "livePostApiV1AccessRecoveryConfirmV1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericAcceptedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Recovery Confirm",
+        "tags": [
+          "access"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/access/recovery/request": {
+      "post": {
+        "operationId": "livePostApiV1AccessRecoveryRequestV1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailOnlyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericAcceptedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Recovery Request",
+        "tags": [
+          "access"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/access/register": {
+      "post": {
+        "operationId": "livePostApiV1AccessRegisterV1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountRegistrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Register",
         "tags": [
           "access"
         ],
@@ -2609,6 +3249,50 @@
         "x-implementation-status": "live"
       }
     },
+    "/api/v1/jobs/{job_id}/result": {
+      "get": {
+        "operationId": "liveGetApiV1JobsJobIdResultV1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecognitionResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Get Recognition Result",
+        "tags": [
+          "jobs"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
     "/api/v1/jobs/{job_id}/retry": {
       "post": {
         "operationId": "livePostApiV1JobsJobIdRetryV1",
@@ -2744,6 +3428,236 @@
         "summary": "Record Manual Fallback",
         "tags": [
           "jobs"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "liveGetApiV1MeV1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Get Me",
+        "tags": [
+          "account"
+        ],
+        "x-implementation-status": "live"
+      },
+      "patch": {
+        "operationId": "livePatchApiV1MeV1",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Patch Me",
+        "tags": [
+          "account"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/me/sessions": {
+      "get": {
+        "operationId": "liveGetApiV1MeSessionsV1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSessionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Sessions",
+        "tags": [
+          "account"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/me/sessions/revoke-others": {
+      "post": {
+        "operationId": "livePostApiV1MeSessionsRevokeOthersV1",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Revoke Others",
+        "tags": [
+          "account"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/me/sessions/{session_id}": {
+      "delete": {
+        "operationId": "liveDeleteApiV1MeSessionsSessionIdV1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Revoke Session",
+        "tags": [
+          "account"
         ],
         "x-implementation-status": "live"
       }

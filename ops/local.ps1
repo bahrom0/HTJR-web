@@ -16,6 +16,25 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Repair-ProcessPathEnvironment {
+    $pathKeys = @(
+        [Environment]::GetEnvironmentVariables().Keys |
+            Where-Object { [String]::Equals([string]$_, 'Path', [StringComparison]::OrdinalIgnoreCase) }
+    )
+    if ($pathKeys.Count -le 1) {
+        return
+    }
+
+    $pathValue = [Environment]::GetEnvironmentVariable('Path', 'Process')
+    foreach ($pathKey in $pathKeys) {
+        [Environment]::SetEnvironmentVariable([string]$pathKey, $null, 'Process')
+    }
+    [Environment]::SetEnvironmentVariable('Path', $pathValue, 'Process')
+}
+
+Repair-ProcessPathEnvironment
+Add-Type -AssemblyName System.Net.Http
+
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $apiRoot = Join-Path $workspaceRoot 'api_server'
 $webRoot = Join-Path $workspaceRoot 'web_app'
@@ -187,13 +206,15 @@ if ($Action -eq 'Stop') {
 
 if ($Action -eq 'Status') {
     $webReady = Test-TrackedWebProcess -State (Read-WebState)
-    $apiReady = Test-ApiStatus
+    Write-Output $(if ($webReady) { '[OK] Frontend: ready at http://127.0.0.1:5173' } else { '[--] Frontend: not ready' })
+    & $apiLauncher -Action Status -Port $ApiPort
+    $apiReady = $LASTEXITCODE -eq 0
     $roundTripReady = $webReady -and (Test-LiveRoundTrip -Port $WebPort) -and (Test-ErrorEnvelopeRoundTrip -Port $WebPort)
     if ($apiReady -and $roundTripReady) {
-        Write-Output 'Tajik HTR Studio local stack is ready.'
+        Write-Output '[OK] Browser -> API proxy: ready'
         exit 0
     }
-    Write-Output 'Tajik HTR Studio local stack is not ready.'
+    Write-Output '[--] Browser -> API proxy: not ready'
     exit 1
 }
 

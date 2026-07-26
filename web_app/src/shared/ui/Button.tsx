@@ -23,6 +23,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={type}
       className={`ui-button ui-button--${variant} ${className}`.trim()}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading && <span className="ui-spinner" aria-hidden="true" />}

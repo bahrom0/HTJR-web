@@ -1,7 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Button, Dialog, Field, IconButton, Tabs, Toast } from './index';
+import {
+  Button,
+  Dialog,
+  Field,
+  IconButton,
+  LoadingState,
+  PartialState,
+  Tabs,
+  Toast,
+} from './index';
 
 describe('Softly UI primitives', () => {
   it('exposes semantic labels, errors and disabled state', () => {
@@ -46,5 +55,19 @@ describe('Softly UI primitives', () => {
   it('announces a toast without moving focus', () => {
     render(<Toast message="Сохранено" onDismiss={() => undefined} />);
     expect(screen.getByText('Сохранено').parentElement).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('announces loading and partial data states', () => {
+    render(
+      <>
+        <LoadingState />
+        <PartialState>Три строки ещё требуют проверки.</PartialState>
+      </>,
+    );
+    expect(screen.getByText('Загружаем данные').closest('[role="status"]')).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+    expect(screen.getByText('Три строки ещё требуют проверки.')).toBeInTheDocument();
   });
 });

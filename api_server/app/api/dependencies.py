@@ -11,6 +11,9 @@ from app.services.access import AccessDenied
 @dataclass(frozen=True, slots=True)
 class AuthenticatedSession:
     id: str
+    session_id: str
+    user_id: str | None
+    auth_method: str
 
 
 def require_session(request: Request) -> AuthenticatedSession:
@@ -19,7 +22,12 @@ def require_session(request: Request) -> AuthenticatedSession:
         current = request.app.state.access.authenticate(token)
     except AccessDenied as error:
         raise ApiError(401, "access_denied", "The access session is invalid or expired.") from error
-    return AuthenticatedSession(id=current["id"])
+    return AuthenticatedSession(
+        id=current["owner_id"],
+        session_id=current["id"],
+        user_id=current["user_id"],
+        auth_method=current["auth_method"],
+    )
 
 
 def require_mutation_session(
@@ -31,4 +39,9 @@ def require_mutation_session(
         request.app.state.access.validate_csrf(current, x_csrf_token)
     except AccessDenied as error:
         raise ApiError(401, "access_denied", "The access session or CSRF token is invalid.") from error
-    return AuthenticatedSession(id=current["id"])
+    return AuthenticatedSession(
+        id=current["owner_id"],
+        session_id=current["id"],
+        user_id=current["user_id"],
+        auth_method=current["auth_method"],
+    )
