@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'motion/react';
 
 import { motionTransition, useAccessibleMotion } from '@shared/motion';
 import { Icon, type IconName } from '@shared/ui';
-import { ThemeToggle } from '@shared/theme/ThemeToggle';
 
 const navigationItems = [
   ['/', 'Главная', 'home'],
@@ -16,6 +15,7 @@ export function PrimaryNavigation({ onLogout }: Readonly<{ onLogout: () => void 
   const [isOpen, setIsOpen] = useState(false);
   const canAnimate = useAccessibleMotion();
   const closeMenu = () => setIsOpen(false);
+
   return (
     <nav className="primary-navigation" aria-label="Основная навигация">
       <button
@@ -28,6 +28,7 @@ export function PrimaryNavigation({ onLogout }: Readonly<{ onLogout: () => void 
       >
         <Icon name="menu" /> <span>Меню</span>
       </button>
+
       <AnimatePresence initial={false}>
         <motion.div
           id="primary-navigation-links"
@@ -50,7 +51,6 @@ export function PrimaryNavigation({ onLogout }: Readonly<{ onLogout: () => void 
             </NavLink>
           </div>
           <div className="primary-navigation__mobile-tools">
-            <ThemeToggle />
             <button
               className="ui-button ui-button--quiet"
               type="button"

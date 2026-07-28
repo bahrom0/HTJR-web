@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { AppShell } from '@app/shell/AppShell';
 import { RouteError } from '@app/shell/RouteError';
@@ -16,11 +16,8 @@ const ResultRoute = lazy(() => import('@routes/result/ResultRoute'));
 const ProcessingRoute = lazy(() => import('@routes/processing/ProcessingRoute'));
 const SettingsRoute = lazy(() => import('@routes/settings/SettingsRoute'));
 const DocumentsRoute = lazy(() => import('@routes/documents/DocumentsRoute'));
-const OrganizerRoute = lazy(() => import('@routes/organizer/OrganizerRoute'));
 const EditorRoute = lazy(() => import('@routes/editor/EditorRoute'));
-const ReviewRoute = lazy(() => import('@routes/review/ReviewRoute'));
 const ExportRoute = lazy(() => import('@routes/export/ExportRoute'));
-const DiagnosticsRoute = lazy(() => import('@routes/diagnostics/DiagnosticsRoute'));
 
 function RouteFallback() {
   return <p role="status">Открываем раздел…</p>;
@@ -52,11 +49,11 @@ export const router = createBrowserRouter([
           { path: '/settings', element: lazyRoute(<SettingsRoute />) },
           { path: '/documents', element: lazyRoute(<DocumentsRoute />) },
           { path: '/documents/:documentId', element: lazyRoute(<DocumentsRoute />) },
-          { path: '/organizer', element: lazyRoute(<OrganizerRoute />) },
+          { path: '/organizer', element: <Navigate to="/documents" replace /> },
           { path: '/editor', element: lazyRoute(<EditorRoute />) },
-          { path: '/review', element: lazyRoute(<ReviewRoute />) },
+          { path: '/review', element: <Navigate to="/editor" replace /> },
           { path: '/export', element: lazyRoute(<ExportRoute />) },
-          { path: '/diagnostics', element: lazyRoute(<DiagnosticsRoute />) },
+          { path: '/diagnostics', element: <Navigate to="/settings" replace /> },
         ],
       },
       { path: '*', element: lazyRoute(<NotFoundRoute />) },

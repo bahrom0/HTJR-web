@@ -10,8 +10,10 @@ import {
   resendAccountVerification,
   verifyAccountEmail,
 } from '@shared/api/client';
-import { fadeVariants, motionTransition, useAccessibleMotion } from '@shared/motion';
-import { Button, Field, Icon, Status } from '@shared/ui';
+import { motionTransition, useAccessibleMotion } from '@shared/motion';
+import { Button, Field, Status } from '@shared/ui';
+
+type AuthMode = 'sign-in' | 'register' | 'verify' | 'recover';
 
 function safeReturnTo(value: unknown): string {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
@@ -19,10 +21,17 @@ function safeReturnTo(value: unknown): string {
     : '/';
 }
 
+function modeFromPath(pathname: string): AuthMode {
+  if (pathname.endsWith('/register')) return 'register';
+  if (pathname.endsWith('/verify')) return 'verify';
+  if (pathname.endsWith('/recover')) return 'recover';
+  return 'sign-in';
+}
+
 function errorText(code: string): string {
   const known: Record<string, string> = {
     account_exists: 'Аккаунт с такой почтой уже существует.',
-    email_not_verified: 'Сначала подтвердите почту.',
+    email_not_verified: 'Сначала подтвердите электронную почту.',
     access_denied: 'Почта или пароль указаны неверно.',
     invalid_or_expired_code: 'Код неверен или уже истёк.',
     rate_limited: 'Слишком много попыток. Подождите и повторите.',
@@ -30,15 +39,6 @@ function errorText(code: string): string {
     request_timeout: 'Сервер отвечает слишком долго. Попробуйте ещё раз.',
   };
   return known[code] ?? 'Не удалось выполнить действие. Проверьте данные и повторите.';
-}
-
-type AuthMode = 'sign-in' | 'register' | 'verify' | 'recover';
-
-function modeFromPath(pathname: string): AuthMode {
-  if (pathname.endsWith('/register')) return 'register';
-  if (pathname.endsWith('/verify')) return 'verify';
-  if (pathname.endsWith('/recover')) return 'recover';
-  return 'sign-in';
 }
 
 export default function AccessRoute() {
@@ -62,7 +62,6 @@ export default function AccessRoute() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [developmentCode, setDevelopmentCode] = useState<string | undefined>(
@@ -88,26 +87,22 @@ export default function AccessRoute() {
     () =>
       ({
         'sign-in': {
-          eyebrow: 'Вход в аккаунт',
-          title: 'Продолжить работу',
-          description: 'Ваши документы будут доступны на всех активных сессиях этого аккаунта.',
+          title: 'Tajik HTR\nStudio',
+          description: 'Войдите, чтобы продолжить работу с рукописями.',
         },
         register: {
-          eyebrow: 'Новый аккаунт',
           title: 'Создать аккаунт',
-          description: 'Один аккаунт хранит ваши документы, историю обработки и настройки.',
+          description: 'Документы и результаты будут привязаны к вашему аккаунту.',
         },
         verify: {
-          eyebrow: 'Подтверждение почты',
-          title: 'Введите код из письма',
-          description: 'Код действует ограниченное время и после использования становится недействительным.',
+          title: 'Подтвердить почту',
+          description: 'Введите шестизначный код из письма.',
         },
         recover: {
-          eyebrow: 'Восстановление доступа',
-          title: recoveryRequested ? 'Задайте новый пароль' : 'Восстановить пароль',
+          title: recoveryRequested ? 'Новый пароль' : 'Восстановить пароль',
           description: recoveryRequested
-            ? 'Введите одноразовый код и новый пароль.'
-            : 'Укажите почту аккаунта. Ответ сервера не раскрывает, зарегистрирована ли она.',
+            ? 'Введите код восстановления и новый пароль.'
+            : 'Укажите почту аккаунта, чтобы получить код.',
         },
       })[mode],
     [mode, recoveryRequested],
@@ -165,17 +160,13 @@ export default function AccessRoute() {
     }
     setCode('');
     setDevelopmentCode(undefined);
-    setNotice(undefined);
-    navigate('/access', {
-      replace: true,
-      state: { email, returnTo },
-    });
+    navigate('/access', { replace: true, state: { email, returnTo } });
   }
 
   async function resend() {
     if (resendRemaining > 0) return;
     if (!email) {
-      setError('Сначала укажите почту.');
+      setError('Сначала укажите электронную почту.');
       return;
     }
     setSubmitting(true);
@@ -213,241 +204,172 @@ export default function AccessRoute() {
       setError(errorText(result.error.code));
       return;
     }
-    setCode('');
-    setNewPassword('');
     setDevelopmentCode(undefined);
-    setNotice(undefined);
-    setRecoveryRequested(false);
     navigate('/access', { replace: true, state: { email, returnTo } });
   }
 
-  async function legacySignIn(event: FormEvent) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(undefined);
-    const message = await access.exchange(accessCode);
-    setSubmitting(false);
-    if (message) {
-      setError(
-        message === 'The access code or session is invalid.'
-          ? 'Код недействителен, истёк или уже использован.'
-          : 'Не удалось войти по временному коду.',
-      );
-      return;
-    }
-    navigate(returnTo, { replace: true });
-  }
-
   return (
-    <section className="access-page" aria-labelledby="access-title">
+    <section className="new-auth" aria-labelledby="access-title">
       <motion.div
-        className="access-panel"
-        initial={canAnimate ? 'hidden' : false}
-        animate="visible"
-        variants={fadeVariants}
+        className="new-auth__card"
+        initial={canAnimate ? { opacity: 0, y: 18, scale: 0.985 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={motionTransition.enter}
       >
-        <div className="access-story">
-          <div className="access-story__mark">
-            <Icon name="shield" />
-          </div>
-          <p className="eyebrow">Tajik HTR Studio</p>
-          <h1 id="access-title">Рукописи остаются вашими — между входами и устройствами.</h1>
-          <p>
-            Аккаунт связывает документы, распознавание и исправления с вами, а не с временным
-            кодом браузера.
-          </p>
-          <ul className="access-benefits">
-            <li>
-              <Icon name="shield" />
-              Пароли защищены Argon2id
-            </li>
-            <li>
-              <Icon name="clock" />
-              Сессии можно увидеть и отозвать
-            </li>
-            <li>
-              <Icon name="document" />
-              Документы изолированы по аккаунтам
-            </li>
-          </ul>
-        </div>
+        <p className="new-auth__brand">Tajik HTR Studio</p>
+        <h1 id="access-title">
+          {copy.title.split('\n').map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </h1>
+        <p className="new-auth__description">{copy.description}</p>
 
-        <div className="access-form-card">
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h2>{copy.title}</h2>
-          <p>{copy.description}</p>
+        {mode === 'sign-in' ? (
+          <form className="new-auth__form" onSubmit={signIn}>
+            <Field
+              label="Электронная почта"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <Field
+              label="Пароль"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              error={error}
+              required
+            />
+            <Button type="submit" isLoading={submitting}>
+              Войти
+            </Button>
+          </form>
+        ) : null}
 
-          {mode === 'sign-in' ? (
-            <form className="access-form" onSubmit={signIn}>
-              <Field
-                label="Электронная почта"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-              <Field
-                label="Пароль"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                error={error}
-                required
-              />
-              <Button type="submit" isLoading={submitting}>
-                Войти
-                <Icon name="arrow" />
-              </Button>
-            </form>
-          ) : null}
+        {mode === 'register' ? (
+          <form className="new-auth__form" onSubmit={register}>
+            <Field
+              label="Ваше имя"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
+            <Field
+              label="Электронная почта"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <Field
+              label="Пароль"
+              type="password"
+              autoComplete="new-password"
+              minLength={12}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              hint="Не менее 12 символов."
+              error={error}
+              required
+            />
+            <Button type="submit" isLoading={submitting}>
+              Создать аккаунт
+            </Button>
+          </form>
+        ) : null}
 
-          {mode === 'register' ? (
-            <form className="access-form" onSubmit={register}>
-              <Field
-                label="Ваше имя"
-                autoComplete="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-              />
-              <Field
-                label="Электронная почта"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-              <Field
-                label="Пароль"
-                type="password"
-                autoComplete="new-password"
-                minLength={12}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                hint="Не менее 12 символов."
-                error={error}
-                required
-              />
-              <Button type="submit" isLoading={submitting}>
-                Создать аккаунт
-                <Icon name="arrow" />
-              </Button>
-            </form>
-          ) : null}
+        {mode === 'verify' ? (
+          <form className="new-auth__form" onSubmit={verify}>
+            <Field
+              label="Электронная почта"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <Field
+              label="Код подтверждения"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              error={error}
+              required
+            />
+            <Button type="submit" isLoading={submitting}>
+              Подтвердить почту
+            </Button>
+            <Button
+              variant="quiet"
+              onClick={() => void resend()}
+              disabled={submitting || resendRemaining > 0}
+            >
+              {resendRemaining > 0
+                ? `Новый код через ${resendRemaining} с`
+                : 'Отправить новый код'}
+            </Button>
+          </form>
+        ) : null}
 
-          {mode === 'verify' ? (
-            <form className="access-form" onSubmit={verify}>
-              <Field
-                label="Электронная почта"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-              <Field
-                label="Код подтверждения"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                error={error}
-                required
-              />
-              <Button type="submit" isLoading={submitting}>
-                Подтвердить почту
-                <Icon name="arrow" />
-              </Button>
-              <Button
-                variant="quiet"
-                onClick={() => void resend()}
-                disabled={submitting || resendRemaining > 0}
-              >
-                {resendRemaining > 0
-                  ? `Новый код через ${resendRemaining} с`
-                  : 'Отправить новый код'}
-              </Button>
-            </form>
-          ) : null}
-
-          {mode === 'recover' ? (
-            <form className="access-form" onSubmit={recover}>
-              <Field
-                label="Электронная почта"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                readOnly={recoveryRequested}
-                required
-              />
-              {recoveryRequested ? (
-                <>
-                  <Field
-                    label="Код восстановления"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                    }
-                    required
-                  />
-                  <Field
-                    label="Новый пароль"
-                    type="password"
-                    autoComplete="new-password"
-                    minLength={12}
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    error={error}
-                    required
-                  />
-                </>
-              ) : null}
-              <Button type="submit" isLoading={submitting}>
-                {recoveryRequested ? 'Сохранить новый пароль' : 'Получить код'}
-                <Icon name="arrow" />
-              </Button>
-            </form>
-          ) : null}
-
-          {notice ? <Status tone="info">{notice}</Status> : null}
-          {developmentCode ? (
-            <Status tone="info">
-              Локальный код разработки: <strong>{developmentCode}</strong>
-            </Status>
-          ) : null}
-
-          <nav className="access-links" aria-label="Действия с аккаунтом">
-            {mode !== 'sign-in' ? <Link to="/access">Уже есть аккаунт</Link> : null}
-            {mode === 'sign-in' ? <Link to="/access/register">Создать аккаунт</Link> : null}
-            {mode === 'sign-in' ? <Link to="/access/recover">Забыли пароль?</Link> : null}
-          </nav>
-
-          {mode === 'sign-in' ? (
-            <details className="access-legacy">
-              <summary>Временный код администратора</summary>
-              <form className="access-form" onSubmit={legacySignIn}>
+        {mode === 'recover' ? (
+          <form className="new-auth__form" onSubmit={recover}>
+            <Field
+              label="Электронная почта"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              readOnly={recoveryRequested}
+              required
+            />
+            {recoveryRequested ? (
+              <>
                 <Field
-                  label="Код доступа"
-                  hint="Доступно только если сервер запущен с dev/admin-флагом."
-                  value={accessCode}
-                  onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
-                  spellCheck={false}
+                  label="Код восстановления"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                  }
                   required
                 />
-                <Button type="submit" variant="secondary" isLoading={submitting}>
-                  Войти по коду
-                </Button>
-              </form>
-            </details>
-          ) : null}
-        </div>
+                <Field
+                  label="Новый пароль"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={12}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  error={error}
+                  required
+                />
+              </>
+            ) : null}
+            <Button type="submit" isLoading={submitting}>
+              {recoveryRequested ? 'Сохранить новый пароль' : 'Получить код'}
+            </Button>
+          </form>
+        ) : null}
+
+        {notice ? <Status tone="info">{notice}</Status> : null}
+        {developmentCode ? (
+          <Status tone="info">
+            Локальный код разработки: <strong>{developmentCode}</strong>
+          </Status>
+        ) : null}
+
+        <nav className="new-auth__links" aria-label="Действия с аккаунтом">
+          {mode !== 'sign-in' ? <Link to="/access">Уже есть аккаунт</Link> : null}
+          {mode === 'sign-in' ? <Link to="/access/register">Создать аккаунт</Link> : null}
+          {mode === 'sign-in' ? <Link to="/access/recover">Забыли пароль?</Link> : null}
+        </nav>
       </motion.div>
     </section>
   );

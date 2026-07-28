@@ -315,16 +315,31 @@ export default function PreparationRoute() {
     <main className="preparation-page" id="main-content" tabIndex={-1}>
       <header className="page-heading preparation-heading">
         <div>
-          <p className="eyebrow">Подготовка страницы</p>
-          <h1>Проверьте изображение перед распознаванием</h1>
-          <p>
-            Оригинал остаётся неизменным. Предпросмотр создаётся сервером только для выбранного
-            рецепта.
-          </p>
+          <h1>Подготовка страницы</h1>
+          <p>Проверьте поворот, края и читаемость изображения.</p>
         </div>
-        <Link className="page-heading__back" to="/capture">
-          К импорту
-        </Link>
+        <div className="preparation-heading__actions">
+          <Link className="ui-button ui-button--secondary" to="/capture">
+            Отмена
+          </Link>
+          {!state.preparedAsset || !state.recipe || !isSameRecipe(recipe, state.recipe) ? (
+            <Button
+              isLoading={busy === 'preview'}
+              disabled={busy !== null}
+              onClick={() => void preview()}
+            >
+              Подготовить
+            </Button>
+          ) : (
+            <Button
+              isLoading={busy === 'confirm'}
+              disabled={busy !== null}
+              onClick={() => void confirm()}
+            >
+              Найти строки
+            </Button>
+          )}
+        </div>
       </header>
       <div className="preparation-layout">
         <section className="preparation-canvas-card" aria-label="Подготовка изображения">
@@ -592,28 +607,6 @@ export default function PreparationRoute() {
                 {Object.keys(state.qualityMetrics).length}.
               </p>
             ) : null}
-            <div className="preparation-actions">
-              <Button
-                isLoading={busy === 'preview'}
-                disabled={busy !== null}
-                onClick={() => void preview()}
-              >
-                Создать предпросмотр
-              </Button>
-              <Button
-                variant="secondary"
-                isLoading={busy === 'confirm'}
-                disabled={
-                  busy !== null ||
-                  !state.preparedAsset ||
-                  !state.recipe ||
-                  !isSameRecipe(recipe, state.recipe)
-                }
-                onClick={() => void confirm()}
-              >
-                {state.confirmed ? 'Поставить CRAFT в очередь' : 'Подтвердить и запустить CRAFT'}
-              </Button>
-            </div>
             {state.confirmed ? (
               <p className="preparation-confirmed" role="status">
                 Рецепт подтверждён. Запустите durable-задачу CRAFT, чтобы получить области строк для

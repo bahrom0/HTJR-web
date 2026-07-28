@@ -80,7 +80,7 @@ describe('CaptureRoute', () => {
     const file = new File(['image'], 'tajik.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('Выбрать изображение'), { target: { files: [file] } });
     await screen.findByAltText('Предпросмотр выбранной страницы');
-    fireEvent.click(screen.getByRole('button', { name: /Создать документ/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Продолжить/ }));
     await waitFor(() => expect(savePendingUpload).toHaveBeenCalledOnce());
     await waitFor(() => expect(uploadDocument).toHaveBeenCalledOnce());
     await waitFor(() => expect(removePendingUpload).toHaveBeenCalledOnce());

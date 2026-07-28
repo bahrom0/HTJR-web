@@ -834,19 +834,24 @@ export default function RegionReviewRoute() {
     <section className="regions-page" tabIndex={-1} onKeyDown={handleShortcuts}>
       <header className="page-heading regions-heading">
         <div>
-          <p className="eyebrow">Проверка CRAFT-областей</p>
-          <h1>Проверьте строки до распознавания</h1>
-          <p>
-            Координаты сохраняются нормализованными относительно подготовленного снимка.
-            Перемещение, масштаб и изменение размера не меняют исходное изображение.
-          </p>
+          <h1>Проверка строк</h1>
+          <p>Исправьте области CRAFT перед распознаванием текста.</p>
         </div>
-        <Link
-          className="page-heading__back"
-          to={`/preparation?pageId=${encodeURIComponent(pageId)}`}
-        >
-          К подготовке
-        </Link>
+        <div className="preparation-heading__actions">
+          <Link
+            className="ui-button ui-button--secondary"
+            to={`/preparation?pageId=${encodeURIComponent(pageId)}`}
+          >
+            Назад
+          </Link>
+          <Button
+            isLoading={busy === 'confirm'}
+            disabled={busy !== null || (Boolean(jobId) && job?.state !== 'awaiting_region_review')}
+            onClick={() => void saveAndConfirm()}
+          >
+            Распознать текст
+          </Button>
+        </div>
       </header>
 
       <motion.p
@@ -1182,42 +1187,15 @@ export default function RegionReviewRoute() {
           </Card>
 
           <Card className="regions-save-card">
-            <p className="eyebrow">Сохранение</p>
-            <h2>
-              {snapshot.confirmed && !isDirty
-                ? 'Области подтверждены'
-                : isDirty
-                  ? 'Есть несохранённые правки'
-                  : 'Серверная версия актуальна'}
-            </h2>
-            <p>
-              Сначала изменения атомарно проверяются сервером по revision, затем подтверждение
-              возобновляет durable-задачу только для этой версии областей.
-            </p>
+            <p className="eyebrow">Состояние</p>
+            <h2>{isDirty ? 'Есть несохранённые правки' : 'Сохранено на сервере'}</h2>
             <div className="regions-save-actions">
               <Button
-                isLoading={busy === 'save'}
-                disabled={busy !== null || !isDirty}
-                onClick={() => void persistChanges()}
-              >
-                Сохранить области
-              </Button>
-              <Button
                 variant="secondary"
-                isLoading={busy === 'confirm'}
-                disabled={
-                  busy !== null || (Boolean(jobId) && job?.state !== 'awaiting_region_review')
-                }
-                onClick={() => void saveAndConfirm()}
-              >
-                Сохранить и подтвердить
-              </Button>
-              <Button
-                variant="quiet"
                 disabled={busy !== null}
                 onClick={() => void reloadServerVersion()}
               >
-                Обновить с сервера
+                Версия сервера
               </Button>
             </div>
             {message ? (

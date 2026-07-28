@@ -1,21 +1,17 @@
 import { useEffect, useLayoutEffect } from 'react';
-import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 
+import { motionTransition, useAccessibleMotion } from '@shared/motion';
 import { PwaUpdateNotice } from '@shared/pwa/PwaUpdateNotice';
 import { ThemeToggle } from '@shared/theme/ThemeToggle';
+import { Icon } from '@shared/ui';
 import { useNetworkStatus } from '@shared/lib/useNetworkStatus';
-import { useAccess } from '@shared/access/AccessProvider';
-import { Button } from '@shared/ui';
-import { motionTransition, useAccessibleMotion } from '@shared/motion';
-
-import { PrimaryNavigation } from './PrimaryNavigation';
 
 export function AppShell() {
   const location = useLocation();
   const isOnline = useNetworkStatus();
-  const isAccessRoute = location.pathname === '/access';
-  const access = useAccess();
+  const isAccessRoute = location.pathname.startsWith('/access');
   const canAnimate = useAccessibleMotion();
 
   useLayoutEffect(() => {
@@ -23,63 +19,55 @@ export function AppShell() {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isOnline && location.pathname !== '/offline')
+    if (!isOnline && location.pathname !== '/offline') {
       document.title = 'Нет подключения — Tajik HTR Studio';
+    }
   }, [isOnline, location.pathname]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isAccessRoute ? 'app-shell--access' : ''}`}>
       <a className="skip-link" href="#main-content">
         К основному содержимому
       </a>
-      <header className={`site-header ${isAccessRoute ? 'site-header--access' : ''}`}>
-        <Link className="brand" to="/">
-          <span className="brand__mark" aria-hidden="true">
-            <span />
-          </span>
-          <span>
-            Tajik HTR <strong>Studio</strong>
-          </span>
-        </Link>
-        {!isAccessRoute && access.state === 'authenticated' ? (
-          <PrimaryNavigation onLogout={() => void access.logout()} />
-        ) : null}
-        <div className="header-actions">
-          <p className="status-label">
-            <span className={`status-label__dot ${isOnline ? '' : 'status-label__dot--offline'}`} />
-            {isOnline
-              ? access.state === 'authenticated'
-                ? 'Сессия защищена'
-                : 'Нет сессии'
-              : 'Нет подключения'}
-          </p>
-          {access.state === 'authenticated' ? (
-            <Button variant="quiet" onClick={() => void access.logout()}>
-              Выйти
-            </Button>
-          ) : null}
-          <ThemeToggle />
-        </div>
-      </header>
-      {!isOnline ? (
-        <Link className="offline-banner" to="/offline">
-          Нет подключения: доступны только оболочка и сохранённые локально данные.
-        </Link>
+
+      {!isAccessRoute ? (
+        <header className="new-navigation">
+          <nav className="new-navigation__primary" aria-label="Основная навигация">
+            <NavLink to="/" end>
+              Главная
+            </NavLink>
+            <NavLink to="/documents">Документы</NavLink>
+          </nav>
+          <nav className="new-navigation__tools" aria-label="Настройки интерфейса">
+            <NavLink to="/settings" aria-label="Настройки">
+              <Icon name="settings" />
+            </NavLink>
+            <ThemeToggle />
+          </nav>
+        </header>
       ) : null}
+
+      {!isOnline && !isAccessRoute ? (
+        <NavLink className="offline-banner" to="/offline">
+          Нет подключения: часть действий временно недоступна.
+        </NavLink>
+      ) : null}
+
       <main id="main-content" tabIndex={-1}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
             className="route-stage"
-            initial={canAnimate ? { opacity: 0, y: 10 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={canAnimate ? { opacity: 0, y: -6 } : undefined}
+            initial={canAnimate ? { opacity: 0, y: 14, filter: 'blur(4px)' } : false}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={canAnimate ? { opacity: 0, y: -8 } : undefined}
             transition={motionTransition.enter}
           >
             <Outlet />
           </motion.div>
         </AnimatePresence>
       </main>
+
       <PwaUpdateNotice />
       <ScrollRestoration />
     </div>

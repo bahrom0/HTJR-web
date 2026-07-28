@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import {
-  type JobStreamState,
   createJobSubscription,
   projectJobProgress,
+  type JobStreamState,
 } from '@features/job-progress';
 import { getRecognitionResult, type RecognitionResult } from '@features/results/api';
 import { Button, Card, Icon, Status } from '@shared/ui';
@@ -27,15 +27,6 @@ export default function ResultRoute() {
   const [message, setMessage] = useState<string | null>(null);
   const progress = stream?.snapshot ? projectJobProgress(stream.snapshot) : null;
 
-  async function copyResult(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setMessage('Текст скопирован в буфер обмена.');
-    } catch {
-      setMessage('Не удалось скопировать текст. Выделите его в поле и скопируйте вручную.');
-    }
-  }
-
   useEffect(() => {
     if (!jobId) return;
     const subscription = createJobSubscription({ jobId, onState: setStream });
@@ -57,14 +48,24 @@ export default function ResultRoute() {
     });
   }, [jobId, progress?.isTerminal, stream?.snapshot?.state]);
 
+  async function copyResult(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage('Текст скопирован в буфер обмена.');
+    } catch {
+      setMessage('Не удалось скопировать автоматически. Выделите текст и скопируйте вручную.');
+    }
+  }
+
   if (!jobId) {
     return (
       <main className="result-page" id="main-content" tabIndex={-1}>
-        <Card>
+        <Card className="result-progress">
+          <p className="eyebrow">Результат</p>
           <h1>Не выбрана задача распознавания</h1>
-          <p>Откройте этот экран после подтверждения областей CRAFT.</p>
+          <p>Результат открывается только по идентификатору реальной серверной задачи.</p>
           <Link className="ui-button ui-button--primary" to="/capture">
-            Распознать страницу
+            Добавить страницу
           </Link>
         </Card>
       </main>
@@ -80,12 +81,12 @@ export default function ResultRoute() {
     <main className="result-page" id="main-content" tabIndex={-1}>
       <header className="page-heading result-heading">
         <div>
-          <p className="eyebrow">Распознавание страницы</p>
-          <h1>{result ? 'Текст готов к проверке' : 'Распознаём подтверждённые строки'}</h1>
+          <p className="eyebrow">Результат распознавания</p>
+          <h1>{result ? 'Текст готов к проверке' : 'Обрабатываем подтверждённые строки'}</h1>
           <p>
             {result
-              ? 'Это исходный результат модели. Он сохранён отдельно от будущих правок.'
-              : 'Можно оставить страницу: ход работы сохранён на сервере и восстановится при возвращении.'}
+              ? 'Это исходный результат модели. Ручные правки будут храниться отдельно.'
+              : 'Задача работает на сервере. Можно закрыть страницу и вернуться позже.'}
           </p>
         </div>
         <Link className="page-heading__back" to={regionLink}>
@@ -95,19 +96,22 @@ export default function ResultRoute() {
 
       {!result ? (
         <Card className="result-progress" aria-live="polite">
+          <span className="processing-hero-icon" aria-hidden="true">
+            <span className="ui-spinner" />
+          </span>
           <Status tone={retryableFailure ? 'warning' : 'info'}>
             {progress?.stageLabel ?? 'Подключаемся к задаче…'}
           </Status>
-          <h2>{progress?.counterLabel ?? 'Сервер сообщает реальный этап работы'}</h2>
+          <h2>{progress?.counterLabel ?? 'Ожидаем данные сервера'}</h2>
           <p>
             {retryableFailure
-              ? 'Распознавание прервалось. Вернитесь к областям, чтобы безопасно повторить задачу.'
-              : 'Текст появится здесь автоматически после окончания обработки.'}
+              ? 'Распознавание прервалось. Вернитесь к экрану обработки, чтобы повторить задачу.'
+              : 'Текст появится автоматически после завершения реального OCR-процесса.'}
           </p>
           {message ? <p role="alert">{message}</p> : null}
           <div className="result-actions">
-            <Link className="ui-button ui-button--secondary" to={regionLink}>
-              Вернуться к областям
+            <Link className="ui-button ui-button--secondary" to={`/processing?jobId=${encodeURIComponent(jobId)}`}>
+              Открыть ход обработки
             </Link>
             <Link className="ui-button ui-button--quiet" to="/capture">
               Новая страница
@@ -121,7 +125,9 @@ export default function ResultRoute() {
               <div>
                 <p className="eyebrow">Исходный текст</p>
                 <h2>
-                  {result.isPartial ? 'Есть строки, требующие внимания' : 'Все строки обработаны'}
+                  {result.isPartial
+                    ? 'Некоторые строки требуют внимания'
+                    : 'Все строки обработаны'}
                 </h2>
               </div>
               <Status tone={result.isPartial ? 'warning' : 'success'}>
@@ -130,15 +136,17 @@ export default function ResultRoute() {
             </div>
             <textarea aria-label="Распознанный текст" value={result.rawText} readOnly />
           </Card>
+
           <aside className="result-sidebar">
             <Card>
               <p className="eyebrow">Следующий шаг</p>
-              <h2>Проверьте и отредактируйте текст</h2>
-              <p>
-                Перейдите в интерактивный редактор для проверки строк и автокоррекции букв.
-              </p>
-              <Link className="ui-button ui-button--primary" to={`/editor?jobId=${encodeURIComponent(jobId)}`}>
-                <Icon name="sparkles" /> Открыть в редакторе
+              <h2>Проверьте текст в редакторе</h2>
+              <p>Сопоставьте распознанные строки с изображением и исправьте ошибки модели.</p>
+              <Link
+                className="ui-button ui-button--primary"
+                to={`/editor?jobId=${encodeURIComponent(jobId)}`}
+              >
+                <Icon name="sparkles" /> Открыть редактор
               </Link>
             </Card>
             <Card>
