@@ -189,11 +189,6 @@ export default function SettingsRoute() {
               <SettingRow label="Электронная почта">
                 <span>{access.user?.email || '—'}</span>
               </SettingRow>
-              <SettingRow label="Статус почты">
-                <Status tone={access.user?.emailVerified ? 'success' : 'warning'}>
-                  {access.user?.emailVerified ? 'Подтверждена' : 'Не подтверждена'}
-                </Status>
-              </SettingRow>
               <div className="new-settings__danger">
                 <div>
                   <strong>Выйти из аккаунта</strong>
@@ -305,9 +300,6 @@ export default function SettingsRoute() {
                 <Status tone={isOnline ? 'success' : 'warning'}>
                   {isOnline ? 'Сервер на связи' : 'Нет подключения'}
                 </Status>
-              </SettingRow>
-              <SettingRow label="Метод входа">
-                <span>{access.authMethod === 'account' ? 'Аккаунт' : 'Временный доступ'}</span>
               </SettingRow>
               <SettingRow label="Срок текущей сессии">
                 <span>

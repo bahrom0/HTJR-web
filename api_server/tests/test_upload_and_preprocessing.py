@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 from dataclasses import replace
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -57,15 +59,16 @@ def client(tmp_path, monkeypatch):
         settings,
         database_path=tmp_path / "studio.sqlite3",
         storage_root=tmp_path / "assets",
-        access_code_enabled=True,
     )
     import app.main as main_module
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as current:
-        code, _ = current.app.state.access.issue_code("upload-tests")
-        exchange = current.post("/api/v1/access/exchange-code", json={"code": code})
-        assert exchange.status_code == 200
-        yield current, exchange.json()["csrf_token"], configured
+        register = current.post(
+            "/api/v1/access/register",
+            json={"email": "upload@example.test", "name": "Upload User", "password": "correct horse battery"},
+        )
+        assert register.status_code == 201
+        yield current, register.json()["csrf_token"], configured
 
 
 def upload(client: TestClient, csrf: str, data: bytes, *, key="upload-test-key-0001", content_type="image/png", filename="C%3A%5Cfakepath%5C%D1%80%D1%83%D0%BA%D0%BE%D0%BF%D0%B8%D1%81%D1%8C.png"):
@@ -88,6 +91,105 @@ def test_real_upload_is_atomic_idempotent_and_does_not_leak_filename(client) -> 
     stored = current.app.state.storage.resolve(row["storage_key"])
     assert stored.is_relative_to(configured.storage_root.resolve())
     assert stored.read_bytes() == data and row["sha256"] == hashlib.sha256(data).hexdigest()
+
+
+def test_uploaded_document_is_listed_and_can_be_soft_deleted(client) -> None:
+    current, csrf, _configured = client
+    created = upload(current, csrf, image_bytes(), key="document-list-test-0001")
+    document_id = created.json()["document_id"]
+
+    listed = current.get("/api/v1/documents")
+    assert listed.status_code == 200
+    document = next(item for item in listed.json()["items"] if item["id"] == document_id)
+    assert document["status"] == "draft"
+    assert document["page_count"] == 1
+    assert document["preview_url"].startswith("/api/v1/assets/")
+
+    removed = current.request(
+        "DELETE",
+        f"/api/v1/documents/{document_id}",
+        json={"revision": document["revision"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert removed.status_code == 204
+    assert all(item["id"] != document_id for item in current.get("/api/v1/documents").json()["items"])
+
+
+def test_real_ocr_line_is_editable_confirmable_and_has_a_crop(client) -> None:
+    current, csrf, _configured = client
+    created = upload(current, csrf, image_bytes(), key="editor-line-test-0001").json()
+    document_id, page_id = created["document_id"], created["page_id"]
+    owner = current.app.state.access.authenticate(current.cookies.get(settings.cookie_name))["owner_id"]
+    region_id, job_id, run_id, run_region_id, crop_id = (str(uuid4()) for _ in range(5))
+    polygon = json.dumps([{"x": 0.1, "y": 0.1}, {"x": 0.9, "y": 0.1}, {"x": 0.9, "y": 0.2}, {"x": 0.1, "y": 0.2}])
+    crop_bytes = image_bytes(size=(600, 100))
+    staged = current.app.state.storage.stage(io.BytesIO(crop_bytes))
+    current.app.state.storage.commit(staged)
+    now = "2026-07-29T10:00:00+00:00"
+    with current.app.state.database.transaction(immediate=True) as connection:
+        connection.execute(
+            "INSERT INTO recognition_regions(id,page_id,polygon_json,reading_order,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+            (region_id, page_id, polygon, 0, now, now),
+        )
+        connection.execute(
+            """INSERT INTO recognition_jobs(
+                 id,owner_session_id,document_id,page_id,state,revision,created_at,updated_at,stage,available_at
+               ) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (job_id, owner, document_id, page_id, "completed", 1, now, now, "completed", now),
+        )
+        connection.execute(
+            "INSERT INTO recognition_runs(id,job_id,attempt,started_at,finished_at,outcome) VALUES (?,?,?,?,?,?)",
+            (run_id, job_id, 1, now, now, "completed"),
+        )
+        connection.execute(
+            """INSERT INTO recognition_run_regions(
+                 id,recognition_run_id,page_id,source_region_id,polygon_json,reading_order,
+                 source,flags_json,page_revision,created_at
+               ) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (run_region_id, run_id, page_id, region_id, polygon, 0, "manual", "[]", 1, now),
+        )
+        connection.execute(
+            """INSERT INTO recognition_line_crops(
+                 id,owner_session_id,recognition_run_id,run_region_id,storage_key,sha256,
+                 byte_size,width,height,padding_fraction,created_at
+               ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (crop_id, owner, run_id, run_region_id, staged.storage_key, staged.sha256, staged.byte_size, 600, 100, 0.08, now),
+        )
+        connection.execute(
+            """INSERT INTO recognition_line_results(
+                 id,owner_session_id,recognition_run_id,run_region_id,crop_id,line_attempt,state,
+                 raw_text,error_retryable,created_at,updated_at
+               ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (str(uuid4()), owner, run_id, run_region_id, crop_id, 1, "completed", "Матни аслӣ", 0, now, now),
+        )
+
+    editor = current.get(f"/api/v1/documents/{document_id}/editor")
+    assert editor.status_code == 200
+    line = editor.json()["lines"][0]
+    assert line["raw_text"] == "Матни аслӣ"
+    assert current.get(line["crop_url"]).content == crop_bytes
+
+    draft = current.put(
+        f"/api/v1/text-lines/{line['id']}/draft",
+        json={"text": "Матни ислоҳшуда", "revision": line["revision"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert draft.status_code == 200
+    reloaded = current.get(f"/api/v1/documents/{document_id}/editor").json()["lines"][0]
+    assert reloaded["text"] == "Матни ислоҳшуда" and reloaded["status"] == "edited"
+
+    confirmed = current.post(
+        f"/api/v1/text-lines/{line['id']}/confirm",
+        json={
+            "text": "Матни ислоҳшуда",
+            "revision": reloaded["revision"],
+            "idempotency_key": "editor-confirm-test-0001",
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert confirmed.status_code == 200
+    final = current.get(f"/api/v1/documents/{document_id}/editor").json()["lines"][0]
+    assert final["text"] == "Матни ислоҳшуда" and final["status"] == "confirmed"
 
 
 @pytest.mark.parametrize(
@@ -157,9 +259,11 @@ def test_preprocessing_is_reproducible_immutable_and_preview_is_owned(client) ->
         assert max(image.size) <= current.app.state.settings.preview_max_edge
     cached = current.get(prepared.json()["prepared_asset"]["preview_url"] + "?max_edge=99999", headers={"If-None-Match": preview.headers["etag"]})
     assert cached.status_code == 304
-    other_code, _ = current.app.state.access.issue_code("other-owner")
-    other_exchange = current.post("/api/v1/access/exchange-code", json={"code": other_code})
-    assert other_exchange.status_code == 200
+    other_register = current.post(
+        "/api/v1/access/register",
+        json={"email": "other-upload@example.test", "name": "Other Owner", "password": "correct horse battery"},
+    )
+    assert other_register.status_code == 201
     isolated = current.get(prepared.json()["prepared_asset"]["preview_url"])
     assert isolated.status_code == 404 and isolated.json()["code"] == "asset_not_found"
 

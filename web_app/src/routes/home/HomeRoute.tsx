@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { getDocuments, type DocumentItem } from '@entities/document';
 import { useAccess } from '@shared/access/AccessProvider';
-import { Icon } from '@shared/ui';
+import { Icon, LoadingState } from '@shared/ui';
 
 function statusLabel(status: DocumentItem['status']) {
   return {
@@ -52,7 +52,12 @@ export default function HomeRoute() {
           <Link to="/documents">Посмотреть все <Icon name="arrow" /></Link>
         </header>
 
-        {state === 'loading' ? <div className="new-empty-card" role="status"><p>Загружаем документы…</p></div> : null}
+        {state === 'loading' ? (
+          <LoadingState
+            title="Загружаем документы"
+            description="Получаем последние документы вашего аккаунта."
+          />
+        ) : null}
         {state === 'error' ? (
           <div className="new-empty-card" role="alert">
             <p>Не удалось загрузить документы.</p>

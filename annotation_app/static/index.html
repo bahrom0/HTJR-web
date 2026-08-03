@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Kraken Annotator</title>
+    <link rel="stylesheet" href="/styles.css?v=20260730-5" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M7 7h18v18H7zM11 11v10h10V11z" /></svg>
+        </span>
+        <div>
+          <strong>Kraken Annotator</strong>
+          <span>разметка строк для BLLA</span>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="Разделы">
+        <button class="tab active" data-view="annotate">Разметка <kbd>1</kbd></button>
+        <button class="tab" data-view="dataset">Датасет <kbd>2</kbd></button>
+      </nav>
+      <div class="header-status">
+        <div class="stat"><strong id="header-annotated">0</strong><span>готово</span></div>
+        <div class="stat"><strong id="header-total">0</strong><span>всего</span></div>
+        <div class="save-state" id="save-state" data-state="saved">
+          <span class="save-dot"></span>
+          <span id="save-label">Сохранено</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="annotate-view" class="view annotate-layout active">
+        <aside class="sidebar left-sidebar">
+          <div class="sidebar-section import-section">
+            <div class="section-heading">
+              <span>Источник</span>
+              <span class="count-badge" id="source-count">0</span>
+            </div>
+            <button class="button primary" id="import-raw">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3h16v-3" /></svg>
+              Импортировать raw_dataset
+            </button>
+            <button class="button secondary" id="pick-folder">
+              <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z" /></svg>
+              Выбрать папку
+            </button>
+            <input id="folder-input" type="file" accept="image/*" webkitdirectory multiple hidden />
+            <div id="import-progress" class="inline-message" hidden></div>
+          </div>
+
+          <div class="sidebar-section navigation-section">
+            <div class="section-heading">
+              <span>Изображение</span>
+              <span id="image-position">0 / 0</span>
+            </div>
+            <div class="image-name" id="image-name">Импортируйте фотографии</div>
+            <div class="image-meta" id="image-dimensions">—</div>
+            <div class="nav-buttons">
+              <button class="icon-button" id="previous-image" aria-label="Предыдущее изображение">
+                <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg>
+              </button>
+              <button class="button primary next-button" id="next-image">
+                Следующее
+                <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="sidebar-section correction-section">
+            <div class="section-heading">
+              <span>Наклон и поворот</span>
+              <span id="correction-value">0°</span>
+            </div>
+            <div class="rotation-actions" role="group" aria-label="Поворот изображения">
+              <button class="button secondary" id="rotate-left" type="button" title="Повернуть на 90° влево">
+                ↶ 90°
+              </button>
+              <button class="button secondary" id="rotation-reset" type="button">Сброс</button>
+              <button class="button secondary" id="rotate-right" type="button" title="Повернуть на 90° вправо">
+                90° ↷
+              </button>
+            </div>
+            <label for="deskew-slider">
+              Точный наклон
+              <span class="field-value" id="deskew-value">0.0°</span>
+            </label>
+            <input
+              id="deskew-slider"
+              type="range"
+              min="-15"
+              max="15"
+              step="0.1"
+              value="0"
+              aria-describedby="deskew-help"
+            />
+            <p class="control-help" id="deskew-help">
+              Сначала выровняйте страницу, затем размечайте строки. Коррекция сохраняется и применяется к PAGE XML экспорту.
+            </p>
+            <div class="baseline-preset">
+              <label for="future-baseline-angle">
+                Наклон Baseline
+                <span class="field-value" id="future-baseline-value">0.0°</span>
+              </label>
+              <input
+                id="future-baseline-angle"
+                type="range"
+                min="-20"
+                max="20"
+                step="0.5"
+                value="0"
+                aria-describedby="future-baseline-help"
+              />
+              <p class="control-help" id="future-baseline-help">
+                Применяется ко всем новым строкам на этой фотографии и сбрасывается на следующей.
+              </p>
+            </div>
+          </div>
+
+          <div class="sidebar-section metadata-section">
+            <div class="section-heading"><span>Метаданные</span><span>автосохранение</span></div>
+            <label>
+              Разделение
+              <select id="meta-split">
+                <option value="unassigned">Автоматически 90/10</option>
+                <option value="train">Train</option>
+                <option value="validation">Validation</option>
+                <option value="test">Test</option>
+              </select>
+            </label>
+            <label>
+              Документ / коллекция
+              <input id="meta-document" type="text" placeholder="Например: тетрадь 01" />
+            </label>
+            <div class="two-columns">
+              <label>
+                Автор
+                <input id="meta-writer" type="text" placeholder="Неизвестен" />
+              </label>
+              <label>
+                Язык
+                <input id="meta-language" type="text" value="Tajik" />
+              </label>
+            </div>
+            <label>
+              Примечание
+              <textarea id="meta-notes" rows="3" placeholder="Необязательное примечание"></textarea>
+            </label>
+          </div>
+
+          <div class="shortcut-card">
+            <div><kbd>Enter</kbd><span>добавить область</span></div>
+            <div><kbd>двойной клик</kbd><span>следующее фото</span></div>
+            <div><kbd>Del</kbd><span>удалить область</span></div>
+            <div><kbd>колесо</kbd><span>масштаб</span></div>
+            <div><kbd>Space</kbd><span>перемещение</span></div>
+            <div><kbd>[ / ]</kbd><span>поворот на 90°</span></div>
+          </div>
+        </aside>
+
+        <section class="canvas-column">
+          <div class="canvas-toolbar">
+            <div class="tool-hint">
+              <span class="tool-indicator"></span>
+              Протяните рамку вокруг одной строки
+            </div>
+            <div class="zoom-controls">
+              <button class="icon-button compact" id="zoom-out" aria-label="Уменьшить">
+                <svg viewBox="0 0 24 24"><path d="M5 12h14" /></svg>
+              </button>
+              <button class="zoom-value" id="zoom-fit" title="Вписать изображение">100%</button>
+              <button class="icon-button compact" id="zoom-in" aria-label="Увеличить">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="canvas-shell" id="canvas-shell">
+            <canvas id="annotation-canvas" tabindex="0" aria-label="Область разметки"></canvas>
+            <div class="empty-canvas" id="empty-canvas">
+              <svg viewBox="0 0 64 64"><path d="M10 14h44v36H10zM17 39l10-10 8 8 5-5 7 7M22 23h.01" /></svg>
+              <strong>Нет изображений</strong>
+              <span>Импортируйте raw_dataset или выберите папку</span>
+            </div>
+            <div class="pending-banner" id="pending-banner" hidden>
+              <span>Область готова</span>
+              <kbd>Enter</kbd>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar right-sidebar">
+          <div class="region-header">
+            <div>
+              <span>Строки</span>
+              <strong id="region-count">0</strong>
+            </div>
+            <button class="icon-button compact" id="undo-button" aria-label="Отменить последнее действие">
+              <svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M5 12h9a5 5 0 0 1 5 5" /></svg>
+            </button>
+          </div>
+          <div id="region-list" class="region-list">
+            <div class="empty-list">Нарисуйте первую строку</div>
+          </div>
+          <div class="region-editor" id="region-editor" hidden>
+            <div class="section-heading"><span>Выбранная строка</span><span id="selected-order">#1</span></div>
+            <label>
+              Тип линии
+              <input id="region-type" type="text" value="DefaultLine" />
+            </label>
+            <label>
+              Baseline <span id="baseline-value">82%</span>
+              <input id="baseline-slider" type="range" min="55" max="95" value="82" />
+            </label>
+            <div class="baseline-explanation">Красная линия должна проходить по основанию букв.</div>
+            <button class="button danger" id="delete-region">Удалить строку</button>
+          </div>
+        </aside>
+      </section>
+
+      <section id="dataset-view" class="view dataset-view">
+        <div class="dataset-header">
+          <div>
+            <span class="eyebrow">SQLite + PAGE XML</span>
+            <h1>Размеченный датасет</h1>
+            <p>Проверяйте изображения, метаданные и готовность экспорта.</p>
+          </div>
+          <div class="dataset-actions">
+            <button class="button secondary" id="refresh-dataset">
+              <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.3M20 5v6h-6" /></svg>
+              Обновить
+            </button>
+            <button class="button primary" id="export-dataset">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3h16v-3" /></svg>
+              Экспорт для Kraken
+            </button>
+          </div>
+        </div>
+        <div class="summary-grid">
+          <article><span>Фотографии</span><strong id="summary-total">0</strong></article>
+          <article><span>Размечено</span><strong id="summary-annotated">0</strong></article>
+          <article><span>Строки</span><strong id="summary-regions">0</strong></article>
+          <article><span>Осталось</span><strong id="summary-pending">0</strong></article>
+        </div>
+        <div class="dataset-toolbar">
+          <label class="search-box">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+            <input id="dataset-search" type="search" placeholder="Поиск по имени или документу" />
+          </label>
+          <select id="dataset-filter" aria-label="Фильтр статуса">
+            <option value="all">Все изображения</option>
+            <option value="annotated">Только размеченные</option>
+            <option value="pending">Без разметки</option>
+          </select>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Изображение</th>
+                <th>Размер</th>
+                <th>Строки</th>
+                <th>Split</th>
+                <th>Статус</th>
+                <th>Изменено</th>
+              </tr>
+            </thead>
+            <tbody id="dataset-table"></tbody>
+          </table>
+          <div class="table-empty" id="table-empty" hidden>Подходящих изображений нет</div>
+        </div>
+        <div class="export-result" id="export-result" hidden></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js?v=20260730-5" type="module"></script>
+  </body>
+</html>

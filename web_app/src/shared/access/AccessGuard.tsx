@@ -1,14 +1,16 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAccess } from './AccessProvider';
+import { LoadingState } from '@shared/ui';
 
 export function AccessGuard() {
   const access = useAccess();
   const location = useLocation();
   if (access.state === 'checking')
     return (
-      <p className="access-check" role="status">
-        Проверяем защищённую сессию…
-      </p>
+      <LoadingState
+        title="Проверяем сессию"
+        description="Подключаем защищённое рабочее пространство."
+      />
     );
   if (access.state === 'anonymous')
     return (

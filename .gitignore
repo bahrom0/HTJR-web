@@ -2,6 +2,7 @@
 .agents/
 .codex/
 .playwright-mcp/
+.codebase-memory/
 
 # Legacy and local source material outside the new Web/API projects
 HTR v2 CER/
@@ -36,6 +37,7 @@ playwright-report/
 test-results/
 web_app/.playwright-cli/
 web_app/output/
+output/playwright/
 
 # Python build/runtime
 .venv/
@@ -57,3 +59,6 @@ api_server/models/*
 !api_server/models/craft/
 api_server/models/craft/*
 !api_server/models/craft/manifest.json
+
+# Local source images and training material
+raw_dataset/

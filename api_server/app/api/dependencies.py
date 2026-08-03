@@ -12,8 +12,7 @@ from app.services.access import AccessDenied
 class AuthenticatedSession:
     id: str
     session_id: str
-    user_id: str | None
-    auth_method: str
+    user_id: str
 
 
 def require_session(request: Request) -> AuthenticatedSession:
@@ -26,7 +25,6 @@ def require_session(request: Request) -> AuthenticatedSession:
         id=current["owner_id"],
         session_id=current["id"],
         user_id=current["user_id"],
-        auth_method=current["auth_method"],
     )
 
 
@@ -43,5 +41,4 @@ def require_mutation_session(
         id=current["owner_id"],
         session_id=current["id"],
         user_id=current["user_id"],
-        auth_method=current["auth_method"],
     )

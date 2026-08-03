@@ -17,9 +17,11 @@ import time
 from dataclasses import dataclass
 from math import prod
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from PIL import Image
+
+from app.ml.cuda import configure_cuda_inference
 
 
 class TrocrRuntimeError(RuntimeError):
@@ -406,6 +408,8 @@ class TrocrRuntime:
         if self.requested_device == "cuda" and not torch.cuda.is_available():
             raise TrocrRuntimeError("trocr_cuda_unavailable")
         self._device = torch.device("cuda" if wants_cuda else "cpu")
+        if self._device.type == "cuda":
+            configure_cuda_inference(torch)
         # The base model occupies about 1.34 GB in F32.  Windows hosts with a
         # constrained commit/pagefile budget can still fail after avoiding the
         # safetensors mmap if the complete F32 model remains resident.  CPU
@@ -507,7 +511,7 @@ class TrocrRuntime:
             raise TrocrRuntimeError("trocr_warmup_generate_failed") from error
         finally:
             del inputs, pixel_values, generated
-            self._cleanup_memory()
+            self._cleanup_memory(release_cuda_cache=False)
         self._evidence = TrocrReadinessEvidence(
             model_version=status.model_version or "unknown",
             adapter_version=status.adapter_version or "unknown",
@@ -523,15 +527,26 @@ class TrocrRuntime:
         return self._evidence
 
     def recognize(self, image: Image.Image, *, num_beams: int, max_new_tokens: int) -> TrocrGeneration:
+        return self.recognize_many([image], num_beams=num_beams, max_new_tokens=max_new_tokens)[0]
+
+    def recognize_many(
+        self,
+        images: Sequence[Image.Image],
+        *,
+        num_beams: int,
+        max_new_tokens: int,
+    ) -> tuple[TrocrGeneration, ...]:
         if not 1 <= num_beams <= 4 or not 1 <= max_new_tokens <= 256:
             raise TrocrRuntimeError("trocr_generation_settings_invalid")
+        if not images:
+            return ()
         self.load()
         assert self._model is not None and self._processor is not None and self._device is not None and self._dtype is not None
         torch, *_ = _runtime_modules()
         started = time.perf_counter()
         inputs = pixel_values = output = None
         try:
-            inputs = self._processor(images=image.convert("RGB"), return_tensors="pt")
+            inputs = self._processor(images=[image.convert("RGB") for image in images], return_tensors="pt")
             pixel_values = inputs.pixel_values.to(device=self._device, dtype=self._dtype)
             with self._lock, torch.inference_mode():
                 output = self._model.generate(
@@ -543,8 +558,8 @@ class TrocrRuntime:
                 )
                 if self._device.type == "cuda":
                     torch.cuda.synchronize(self._device)
-            text = self._processor.batch_decode(output.sequences, skip_special_tokens=True)[0].strip()
-            mean_token_log_probability = None
+            texts = [text.strip() for text in self._processor.batch_decode(output.sequences, skip_special_tokens=True)]
+            mean_token_log_probabilities: list[float | None] = [None] * len(texts)
             if output.scores:
                 try:
                     transition_scores = self._model.compute_transition_scores(
@@ -553,18 +568,23 @@ class TrocrRuntime:
                         beam_indices=getattr(output, "beam_indices", None),
                         normalize_logits=True,
                     )
-                    generated_scores = transition_scores[0, -len(output.scores):]
-                    mean_token_log_probability = float(generated_scores.detach().float().mean().cpu().item())
+                    for index in range(len(texts)):
+                        generated_scores = transition_scores[index, -len(output.scores):]
+                        mean_token_log_probabilities[index] = float(generated_scores.detach().float().mean().cpu().item())
                 except Exception:
                     # The generated text remains valid even when a Transformers
                     # version does not expose transition-score reconstruction.
-                    mean_token_log_probability = None
-            return TrocrGeneration(
-                text=text,
-                duration_ms=round((time.perf_counter() - started) * 1000),
-                generated_token_count=int(output.sequences.shape[-1]),
-                decoding_steps=len(output.scores or ()),
-                mean_token_log_probability=mean_token_log_probability,
+                    mean_token_log_probabilities = [None] * len(texts)
+            duration_ms = round((time.perf_counter() - started) * 1000 / len(texts))
+            return tuple(
+                TrocrGeneration(
+                    text=text,
+                    duration_ms=duration_ms,
+                    generated_token_count=int(output.sequences.shape[-1]),
+                    decoding_steps=len(output.scores or ()),
+                    mean_token_log_probability=mean_token_log_probabilities[index],
+                )
+                for index, text in enumerate(texts)
             )
         except TrocrRuntimeError:
             raise
@@ -572,12 +592,10 @@ class TrocrRuntime:
             raise TrocrRuntimeError("trocr_generate_failed") from error
         finally:
             del inputs, pixel_values, output
-            self._cleanup_memory()
-
-    def _cleanup_memory(self) -> None:
+    def _cleanup_memory(self, *, release_cuda_cache: bool) -> None:
         try:
             torch, *_ = _runtime_modules()
-            if torch.cuda.is_available():
+            if release_cuda_cache and torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except TrocrRuntimeError:
             pass
@@ -590,4 +608,4 @@ class TrocrRuntime:
         self._pending_evidence = None
         if model is not None:
             del model
-        self._cleanup_memory()
+        self._cleanup_memory(release_cuda_cache=True)

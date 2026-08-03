@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@app/shell/AppShell';
 import { RouteError } from '@app/shell/RouteError';
 import { AccessGuard } from '@shared/access/AccessGuard';
+import { LoadingState } from '@shared/ui';
 
 const AccessRoute = lazy(() => import('@routes/access/AccessRoute'));
 const HomeRoute = lazy(() => import('@routes/home/HomeRoute'));
@@ -20,7 +21,7 @@ const EditorRoute = lazy(() => import('@routes/editor/EditorRoute'));
 const ExportRoute = lazy(() => import('@routes/export/ExportRoute'));
 
 function RouteFallback() {
-  return <p role="status">Открываем раздел…</p>;
+  return <LoadingState title="Открываем раздел" description="Загружаем интерфейс." />;
 }
 
 function lazyRoute(element: React.ReactNode) {
@@ -34,8 +35,6 @@ export const router = createBrowserRouter([
     children: [
       { path: '/access', element: lazyRoute(<AccessRoute />) },
       { path: '/access/register', element: lazyRoute(<AccessRoute />) },
-      { path: '/access/verify', element: lazyRoute(<AccessRoute />) },
-      { path: '/access/recover', element: lazyRoute(<AccessRoute />) },
       { path: '/offline', element: lazyRoute(<OfflineRoute />) },
       {
         element: <AccessGuard />,

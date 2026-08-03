@@ -64,9 +64,10 @@ def _seed_page(database: Database, owner: str) -> str:
 
 def _access(database: Database, configured_settings, label: str) -> tuple[AccessService, str, str]:
     service = AccessService(database, configured_settings)
-    code, _ = service.issue_code(label)
-    grant = service.exchange(code, label)
-    return service, grant.session_id, grant.token
+    grant = service.register(
+        f"{label}-{uuid4().hex}@example.test", "correct horse battery", label, "Test browser"
+    )
+    return service, service.authenticate(grant.token)["owner_id"], grant.token
 
 
 def test_persisted_event_projection_is_ordered_owned_and_restart_replayable(tmp_path: Path) -> None:
@@ -155,10 +156,17 @@ def test_event_projection_migration_upgrades_existing_database(tmp_path: Path) -
     database_path = tmp_path / "existing.sqlite3"
     old_database = Database(database_path, migrations_dir=old_migrations)
     old_database.migrate()
-    configured = replace(settings, database_path=database_path, storage_root=tmp_path / "assets")
-    _, owner, _ = _access(old_database, configured, "owner")
-    page_id = _seed_page(old_database, owner)
+    owner = "owner-before-account-migration"
     now = datetime.now(UTC).isoformat()
+    with old_database.transaction(immediate=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO access_sessions(id,token_hash,csrf_hash,created_at,expires_at,last_seen_at)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (owner, b"legacy-token", b"legacy-csrf", now, (datetime.now(UTC) + timedelta(hours=1)).isoformat(), now),
+        )
+    page_id = _seed_page(old_database, owner)
     document_id = None
     with old_database.transaction(immediate=True) as connection:
         document_id = connection.execute("SELECT document_id FROM pages WHERE id=?", (page_id,)).fetchone()[0]
@@ -244,7 +252,6 @@ def test_sse_resume_ownership_and_restart(tmp_path: Path, monkeypatch) -> None:
         settings,
         database_path=tmp_path / "api-events.sqlite3",
         storage_root=tmp_path / "assets",
-        access_code_enabled=True,
         sse_heartbeat_seconds=0.05,
         sse_poll_seconds=0.01,
     )
@@ -252,11 +259,13 @@ def test_sse_resume_ownership_and_restart(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as first_client:
-        code, _ = first_client.app.state.access.issue_code("owner")
-        exchange = first_client.post("/api/v1/access/exchange-code", json={"code": code})
-        csrf = exchange.json()["csrf_token"]
-        session_cookie = exchange.cookies[configured.cookie_name]
-        owner = first_client.app.state.access.authenticate(session_cookie)["id"]
+        register = first_client.post(
+            "/api/v1/access/register",
+            json={"email": "events-owner@example.test", "name": "Events Owner", "password": "correct horse battery"},
+        )
+        csrf = register.json()["csrf_token"]
+        session_cookie = register.cookies[configured.cookie_name]
+        owner = first_client.app.state.access.authenticate(session_cookie)["owner_id"]
         page_id = _seed_page(first_client.app.state.database, owner)
         created = first_client.post(
             f"/api/v1/pages/{page_id}/recognition-jobs",
@@ -284,8 +293,10 @@ def test_sse_resume_ownership_and_restart(tmp_path: Path, monkeypatch) -> None:
         ).status_code == 400
         assert restarted_client.get(f"/events/jobs/{job_id}?after=3").status_code == 409
 
-        other_code, _ = restarted_client.app.state.access.issue_code("other")
-        restarted_client.post("/api/v1/access/exchange-code", json={"code": other_code})
+        restarted_client.post(
+            "/api/v1/access/register",
+            json={"email": "events-other@example.test", "name": "Events Other", "password": "correct horse battery"},
+        )
         assert restarted_client.get(f"/events/jobs/{job_id}").status_code == 404
 
 
@@ -348,16 +359,18 @@ def test_expired_access_cannot_open_sse(tmp_path: Path, monkeypatch) -> None:
         settings,
         database_path=tmp_path / "expired.sqlite3",
         storage_root=tmp_path / "assets",
-        access_code_enabled=True,
     )
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as client:
-        code, _ = client.app.state.access.issue_code("owner")
-        exchange = client.post("/api/v1/access/exchange-code", json={"code": code})
-        token = exchange.cookies[configured.cookie_name]
-        owner = client.app.state.access.authenticate(token)["id"]
+        register = client.post(
+            "/api/v1/access/register",
+            json={"email": "expired-owner@example.test", "name": "Expired Owner", "password": "correct horse battery"},
+        )
+        token = register.cookies[configured.cookie_name]
+        current = client.app.state.access.authenticate(token)
+        owner = current["owner_id"]
         page_id = _seed_page(client.app.state.database, owner)
         job, _ = client.app.state.jobs.enqueue(
             owner,
@@ -369,8 +382,8 @@ def test_expired_access_cannot_open_sse(tmp_path: Path, monkeypatch) -> None:
         )
         with client.app.state.database.transaction(immediate=True) as connection:
             connection.execute(
-                "UPDATE access_sessions SET expires_at=? WHERE id=?",
-                ((datetime.now(UTC) - timedelta(seconds=1)).isoformat(), owner),
+                "UPDATE user_sessions SET expires_at=? WHERE id=?",
+                ((datetime.now(UTC) - timedelta(seconds=1)).isoformat(), current["id"]),
             )
         response = client.get(f"/events/jobs/{job.id}")
 

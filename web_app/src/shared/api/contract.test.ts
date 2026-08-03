@@ -18,7 +18,9 @@ describe('API v1 contract snapshot', () => {
   const schemas = record(components.schemas);
 
   it('uses the canonical access path and same-origin server', () => {
-    expect(paths['/api/v1/access/exchange-code']).toBeDefined();
+    expect(paths['/api/v1/access/register']).toBeDefined();
+    expect(paths['/api/v1/access/login']).toBeDefined();
+    expect(paths['/api/v1/access/exchange-code']).toBeUndefined();
     expect(paths['/api/v1/access/exchange']).toBeUndefined();
     expect(root.servers).toEqual([{ url: '/', description: 'Same-origin deployment' }]);
   });

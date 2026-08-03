@@ -1,38 +1,28 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { AccessProvider } from '@shared/access/AccessProvider';
+import { describe, expect, it, vi } from 'vitest';
 
 import HomeRoute from './HomeRoute';
 
-vi.mock('@shared/api/client', () => ({
-  getAccessSession: vi.fn(async () => ({
-    ok: false,
-    error: { code: 'none', message: 'none', retryable: false, requestId: 'test' },
-  })),
-  refreshCsrfToken: vi.fn(),
-  exchangeAccessCode: vi.fn(),
-  logoutAccessSession: vi.fn(),
+vi.mock('@shared/access/AccessProvider', () => ({
+  useAccess: () => ({ user: { name: 'Мадина' } }),
 }));
 
-describe('normalized home', () => {
-  beforeEach(() => Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }));
+vi.mock('@entities/document', () => ({
+  getDocuments: vi.fn(async () => ({ ok: true, value: [] })),
+}));
 
-  it('shows an honest workflow and no fabricated documents', () => {
+describe('HomeRoute', () => {
+  it('shows the real empty document state without fabricated documents', async () => {
     render(
-      <AccessProvider>
-        <MemoryRouter>
-          <HomeRoute />
-        </MemoryRouter>
-      </AccessProvider>,
+      <MemoryRouter>
+        <HomeRoute />
+      </MemoryRouter>,
     );
-    expect(
-      screen.getByRole('heading', { name: 'Превратите снимок страницы в проверенный документ.' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Четыре понятных этапа' })).toBeInTheDocument();
-    expect(screen.getByText(/Ваши рукописи и черновики/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Начать с изображения/ })).toHaveAttribute(
+
+    expect(screen.getByRole('heading', { name: /Здравствуйте, Мадина/ })).toBeInTheDocument();
+    expect(await screen.findByText('Документов пока нет')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Распознать новую страницу/ })).toHaveAttribute(
       'href',
       '/capture',
     );

@@ -59,10 +59,17 @@ def _crop_image(image: Image.Image, polygon: tuple[tuple[float, float], ...], pa
     if not polygon:
         raise RecognitionInputInvalid("recognition_region_empty")
     xs, ys = zip(*polygon, strict=True)
-    left = max(0.0, min(xs) - padding_fraction)
-    top = max(0.0, min(ys) - padding_fraction)
-    right = min(1.0, max(xs) + padding_fraction)
-    bottom = min(1.0, max(ys) + padding_fraction)
+    region_left, region_top = min(xs), min(ys)
+    region_right, region_bottom = max(xs), max(ys)
+    # `padding_fraction` is relative to the selected line, not to the whole
+    # page. Using it as an absolute normalized-page offset made 0.08 add 8%
+    # of the entire photograph on every side of even a tiny manual region.
+    padding_x = (region_right - region_left) * padding_fraction
+    padding_y = (region_bottom - region_top) * padding_fraction
+    left = max(0.0, region_left - padding_x)
+    top = max(0.0, region_top - padding_y)
+    right = min(1.0, region_right + padding_x)
+    bottom = min(1.0, region_bottom + padding_y)
     if right <= left or bottom <= top:
         raise RecognitionInputInvalid("recognition_crop_invalid")
     if image.width < 2 or image.height < 2:

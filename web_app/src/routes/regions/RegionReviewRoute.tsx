@@ -52,7 +52,7 @@ import {
 import { loadRegionDraft, removeRegionDraft, saveRegionDraft } from '@features/regions/persistence';
 import { useAccess } from '@shared/access/AccessProvider';
 import { motionTransition, useAccessibleMotion } from '@shared/motion';
-import { Badge, Button, Card } from '@shared/ui';
+import { Badge, Button, Card, LoadingState } from '@shared/ui';
 
 type CanvasPoint = Readonly<{ x: number; y: number }>;
 type BusyAction = 'save' | 'confirm' | null;
@@ -806,9 +806,10 @@ export default function RegionReviewRoute() {
   if (!asset || !snapshot) {
     return (
       <section className="regions-page regions-page--empty" tabIndex={-1}>
-        <p role="status">
-          {loading ? 'Загружаем области детектора…' : 'Подготавливаем проверку областей…'}
-        </p>
+        <LoadingState
+          title={loading ? 'Загружаем области' : 'Подготавливаем проверку областей'}
+          description="Получаем изображение и результат активного детектора."
+        />
         {message ? <p role="alert">{message}</p> : null}
         {!loading && message ? (
           <Button variant="secondary" onClick={() => void load()}>

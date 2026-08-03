@@ -71,9 +71,9 @@ describe('request transport', () => {
       ),
     );
 
-    const result = await request('/access/exchange-code', parseAccessSession, {
+    const result = await request('/access/login', parseAccessSession, {
       method: 'POST',
-      json: { code: 'not-logged-by-client' },
+      json: { email: 'user@example.test', password: 'not-logged-by-client' },
     });
 
     expect(result).toEqual({

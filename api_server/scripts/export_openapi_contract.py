@@ -12,8 +12,9 @@ from pydantic import BaseModel
 
 from app.main import create_app
 from app.schemas.contracts import (
-    AccessExchangeRequest,
     AccessSession,
+    AccountLoginRequest,
+    AccountRegisterRequest,
     ApiErrorEnvelope,
     Correction,
     CorrectionCreate,
@@ -44,8 +45,9 @@ WEB_CONTRACT_PATH = ROOT.parent / "web_app" / "contracts" / "openapi.v1.json"
 HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 UUID_PARAMETER = {"type": "string", "format": "uuid"}
 CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
-    AccessExchangeRequest,
     AccessSession,
+    AccountLoginRequest,
+    AccountRegisterRequest,
     ApiErrorEnvelope,
     Correction,
     CorrectionCreate,
@@ -222,7 +224,7 @@ def _annotate_scalar_formats(node: Any, property_name: str | None = None) -> Non
 def _normalize_live_operation(path: str, method: str, operation: dict[str, Any]) -> None:
     operation["operationId"] = "live" + re.sub(r"[^A-Za-z0-9]+", "_", f"_{method}_{path}").strip("_").title().replace("_", "") + "V1"
     operation["x-implementation-status"] = "live"
-    if path not in {"/api/v1/health/live", "/api/v1/access/exchange-code"}:
+    if path != "/api/v1/health/live":
         operation["security"] = [{"CookieSession": []}]
     for parameter in operation.get("parameters", []):
         name = parameter.get("name", "")

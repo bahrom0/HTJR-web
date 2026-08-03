@@ -43,6 +43,8 @@ $viteEntry = Join-Path $webRoot 'node_modules\vite\bin\vite.js'
 $viteEntryArgument = 'node_modules\vite\bin\vite.js'
 $stateDirectory = Join-Path $webRoot 'output\.runtime'
 $statePath = Join-Path $stateDirectory 'local-web.json'
+$webOutputLogPath = Join-Path $stateDirectory 'web.stdout.log'
+$webErrorLogPath = Join-Path $stateDirectory 'web.stderr.log'
 
 function Read-WebState {
     if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) {
@@ -145,12 +147,13 @@ function Remove-WebState {
 function Stop-Web {
     $state = Read-WebState
     if (Test-TrackedWebProcess -State $state) {
-        Stop-Process -Id ([int]$state.pid) -ErrorAction Stop
+        $processId = [int]$state.pid
+        Stop-Process -Id $processId -ErrorAction Stop
         try {
-            Wait-Process -Id ([int]$state.pid) -Timeout 10 -ErrorAction Stop
+            Wait-Process -Id $processId -Timeout 10 -ErrorAction Stop
         }
         catch {
-            if ($null -ne (Get-Process -Id ([int]$state.pid) -ErrorAction SilentlyContinue)) {
+            if ($null -ne (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
                 throw
             }
         }
@@ -221,20 +224,26 @@ if ($Action -eq 'Status') {
 if (-not (Test-Path -LiteralPath $viteEntry -PathType Leaf)) {
     throw 'Web dependencies are missing. Run npm.cmd ci in web_app first.'
 }
-if (-not (Test-LoopbackPortAvailable -Port $WebPort)) {
-    throw "The requested Web port $WebPort is already in use."
-}
 
 $priorWebState = Read-WebState
 if (Test-TrackedWebProcess -State $priorWebState) {
-    throw 'The Web dev server is already running. Use -Action Status or -Action Stop.'
+    & $apiLauncher -Action Start -Port $ApiPort -ReadinessTimeoutSeconds $ReadinessTimeoutSeconds
+    if ($LASTEXITCODE -eq 0 -and (Test-LiveRoundTrip -Port $WebPort)) {
+        Write-Output "Tajik HTR Studio local stack is already running at http://127.0.0.1:$WebPort."
+        exit 0
+    }
+    throw 'The tracked Web server is running, but its API connection is unavailable. Use start.bat stop, then start.bat.'
 }
 Remove-WebState
+if (-not (Test-LoopbackPortAvailable -Port $WebPort)) {
+    throw "Web port $WebPort is occupied by an untracked process. Close the old launcher once, or run start.bat stop before starting again."
+}
 
 $nodeCommand = Get-Command node.exe -ErrorAction Stop
 $nodePath = $nodeCommand.Source
 $webProcess = $null
 try {
+    Write-Output '[4/4] Frontend: starting Vite development server...'
     & $apiLauncher -Action Start -Port $ApiPort -ReadinessTimeoutSeconds $ReadinessTimeoutSeconds
     if ($LASTEXITCODE -ne 0) {
         throw 'API/worker launcher failed.'
@@ -244,7 +253,7 @@ try {
     $previousProxyTarget = $env:HTR_WEB_API_PROXY_TARGET
     try {
         $env:HTR_WEB_API_PROXY_TARGET = "http://127.0.0.1:$ApiPort"
-        $webProcess = Start-Process -FilePath $nodePath -ArgumentList @($viteEntryArgument, '--host', '127.0.0.1', '--port', [string]$WebPort, '--strictPort') -WorkingDirectory $webRoot -WindowStyle Hidden -PassThru
+        $webProcess = Start-Process -FilePath $nodePath -ArgumentList @($viteEntryArgument, '--host', '127.0.0.1', '--port', [string]$WebPort, '--strictPort') -WorkingDirectory $webRoot -WindowStyle Hidden -RedirectStandardOutput $webOutputLogPath -RedirectStandardError $webErrorLogPath -PassThru
     }
     finally {
         if ($null -eq $previousProxyTarget) {
@@ -267,7 +276,8 @@ try {
             }
         }
         if (-not $webProcess.HasExited -and (Test-LiveRoundTrip -Port $WebPort) -and (Test-ErrorEnvelopeRoundTrip -Port $WebPort)) {
-            Write-Output "Tajik HTR Studio local stack is ready at http://127.0.0.1:$WebPort."
+            Write-Output "[OK] Frontend: ready at http://127.0.0.1:$WebPort"
+            Write-Output '[READY] Tajik HTR Studio is fully started. Models are preloaded.'
             exit 0
         }
         Start-Sleep -Milliseconds 250

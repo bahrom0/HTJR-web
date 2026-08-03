@@ -1,0 +1,21 @@
+device: cuda:0
+precision: bf16-mixed
+num_workers: 2
+num_threads: 1
+segtrain:
+  training_data:
+    - train.lst
+  evaluation_data:
+    - validation.lst
+  format_type: page
+  checkpoint_path: checkpoints
+  weights_format: safetensors
+  topline: false
+  augment: true
+  line_class_mapping:
+    - ['*', 3]
+    - ['DefaultLine', 3]
+  region_class_mapping: []
+  quit: early
+  min_epochs: 10
+  lrate: 0.0002

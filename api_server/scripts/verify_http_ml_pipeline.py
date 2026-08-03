@@ -113,9 +113,17 @@ def main() -> int:
         )
         try:
             with TestClient(main_module.create_app()) as client:
-                code, _ = client.app.state.access.issue_code("http-runtime-verification")
-                exchange = client.post("/api/v1/access/exchange-code", json={"code": code})
-                csrf = exchange.json()["csrf_token"]
+                register = client.post(
+                    "/api/v1/access/register",
+                    json={
+                        "email": "verification@example.test",
+                        "name": "Runtime Verification",
+                        "password": "correct horse battery",
+                    },
+                )
+                if register.status_code != 201:
+                    raise RuntimeError(f"register_http_{register.status_code}")
+                csrf = register.json()["csrf_token"]
                 upload = client.post(
                     "/api/v1/documents",
                     content=upload_payload,

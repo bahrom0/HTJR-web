@@ -1,9 +1,17 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeProvider } from '@shared/theme';
 import SettingsRoute from './SettingsRoute';
+
+vi.mock('@shared/access/AccessProvider', () => ({
+  useAccess: () => ({
+    user: { name: 'Тестовый пользователь', email: 'test@example.test' },
+    expiresAt: '2026-08-03T12:00:00Z',
+    logout: vi.fn(),
+  }),
+}));
 
 describe('SettingsRoute', () => {
   beforeEach(() => {
@@ -11,7 +19,7 @@ describe('SettingsRoute', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
-  it('renders all 4 setting cards and saves changes to localStorage', () => {
+  it('renders the account and saves appearance preferences to localStorage', () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
@@ -20,27 +28,20 @@ describe('SettingsRoute', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Настройки системы' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Внешний вид' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Распознавание' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Хранилище' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'О приложении' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Настройки' })).toBeInTheDocument();
+    expect(screen.getByText('Тестовый пользователь')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Интерфейс' }));
 
-    // Check version & status
-    expect(screen.getByText('Tajik HTR Studio v1.0.0')).toBeInTheDocument();
-    expect(screen.getByText('Сервер на связи (онлайн)')).toBeInTheDocument();
-
-    // Toggle high contrast
-    const highContrastCheckbox = screen.getByLabelText('Высокая контрастность') as HTMLInputElement;
-    expect(highContrastCheckbox.checked).toBe(false);
-    fireEvent.click(highContrastCheckbox);
-    expect(highContrastCheckbox.checked).toBe(true);
+    const highContrast = screen.getByRole('switch', { name: 'Высокая контрастность' });
+    expect(highContrast).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(highContrast);
+    expect(highContrast).toHaveAttribute('aria-checked', 'true');
 
     const savedSettings = JSON.parse(localStorage.getItem('htr_settings') || '{}');
     expect(savedSettings.highContrast).toBe(true);
   });
 
-  it('clears local cache when clear button is clicked', () => {
+  it('clears local cache when requested', () => {
     localStorage.setItem('htr_draft_1', 'some draft content');
     render(
       <ThemeProvider>
@@ -50,12 +51,10 @@ describe('SettingsRoute', () => {
       </ThemeProvider>,
     );
 
-    const clearButton = screen.getAllByRole('button', { name: 'Очистить локальный кэш' })[0];
-    if (clearButton) {
-      fireEvent.click(clearButton);
-    }
+    fireEvent.click(screen.getAllByRole('button', { name: 'Хранилище' }).at(-1)!);
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить кэш' }));
 
     expect(localStorage.getItem('htr_draft_1')).toBeNull();
-    expect(screen.getByText('Локальный кэш и черновики очищены.')).toBeInTheDocument();
+    expect(screen.getByText('Локальный кэш очищен.')).toBeInTheDocument();
   });
 });

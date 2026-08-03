@@ -10,7 +10,7 @@ import {
 } from '@features/editor';
 import { getRecognitionResult } from '@features/results/api';
 import { useAccess } from '@shared/access/AccessProvider';
-import { Button, Icon, Status } from '@shared/ui';
+import { Button, Icon, LoadingState, Status } from '@shared/ui';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -195,7 +195,14 @@ export default function EditorRoute() {
   }
 
   if (loadState === 'loading' && (documentId || jobId)) {
-    return <main className="new-editor new-editor--empty" id="main-content" tabIndex={-1}><p role="status">Загружаем распознанные строки…</p></main>;
+    return (
+      <main className="new-editor new-editor--empty" id="main-content" tabIndex={-1}>
+        <LoadingState
+          title="Открываем документ"
+          description="Загружаем распознанные строки и их фрагменты."
+        />
+      </main>
+    );
   }
   if (loadState === 'error' || (!documentId && !jobId)) {
     return (

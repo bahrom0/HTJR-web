@@ -14,8 +14,8 @@ dependencies = [
   "numpy==2.2.3",
   "pillow==11.1.0",
   "opencv-python-headless==5.0.0.93",
-  "torch==2.13.0+cpu",
-  "torchvision==0.28.0+cpu",
+  "torch==2.11.0+cu128",
+  "torchvision==0.26.0+cu128",
   "transformers==4.57.6",
   "peft==0.18.0",
   "safetensors==0.5.3",
@@ -25,17 +25,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["httpx==0.28.1", "pytest==9.1.1"]
 
-# The verified local worker uses the CPU PyTorch artifacts.  They are kept on
-# the official PyTorch index rather than silently resolving a GPU build from a
-# different registry at install time.
+# CUDA-enabled PyTorch. It still runs on CPU when config.toml sets CUDA=false.
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
-torchvision = { index = "pytorch-cpu" }
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
 
 [tool.uv]
 environments = ["sys_platform == 'win32'"]
@@ -43,7 +41,6 @@ environments = ["sys_platform == 'win32'"]
 [project.scripts]
 tajik-htr-api = "app.cli:run_api"
 tajik-htr-worker = "app.cli:run_worker"
-tajik-htr-issue-access-code = "app.cli:issue_access_code"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -13,34 +13,9 @@
       }
     },
     "schemas": {
-      "AccessExchangeRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "maxLength": 64,
-            "minLength": 8,
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "AccessExchangeRequest",
-        "type": "object"
-      },
       "AccessSession": {
         "additionalProperties": false,
         "properties": {
-          "auth_method": {
-            "default": "access_code",
-            "enum": [
-              "account",
-              "access_code"
-            ],
-            "title": "Auth Method",
-            "type": "string"
-          },
           "authenticated": {
             "const": true,
             "default": true,
@@ -65,19 +40,12 @@
             "type": "string"
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AccountProfile"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
+            "$ref": "#/components/schemas/AccountProfile"
           }
         },
         "required": [
-          "expires_at"
+          "expires_at",
+          "user"
         ],
         "title": "AccessSession",
         "type": "object"
@@ -119,10 +87,6 @@
             "title": "Email",
             "type": "string"
           },
-          "email_verified": {
-            "title": "Email Verified",
-            "type": "boolean"
-          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -144,7 +108,6 @@
           "id",
           "email",
           "name",
-          "email_verified",
           "created_at",
           "updated_at"
         ],
@@ -179,37 +142,6 @@
           "password"
         ],
         "title": "AccountRegisterRequest",
-        "type": "object"
-      },
-      "AccountRegistrationResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "development_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Development Code"
-          },
-          "email": {
-            "title": "Email",
-            "type": "string"
-          },
-          "verification_expires_at": {
-            "format": "date-time",
-            "title": "Verification Expires At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "email",
-          "verification_expires_at"
-        ],
-        "title": "AccountRegistrationResponse",
         "type": "object"
       },
       "AccountSessionItem": {
@@ -949,45 +881,6 @@
         "title": "EditorLineResponse",
         "type": "object"
       },
-      "EmailCodeRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "maxLength": 64,
-            "minLength": 6,
-            "title": "Code",
-            "type": "string"
-          },
-          "email": {
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email",
-            "type": "string"
-          }
-        },
-        "required": [
-          "email",
-          "code"
-        ],
-        "title": "EmailCodeRequest",
-        "type": "object"
-      },
-      "EmailOnlyRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "email": {
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email",
-            "type": "string"
-          }
-        },
-        "required": [
-          "email"
-        ],
-        "title": "EmailOnlyRequest",
-        "type": "object"
-      },
       "ExportArtifact": {
         "additionalProperties": false,
         "properties": {
@@ -1080,42 +973,6 @@
           "idempotency_key"
         ],
         "title": "ExportCreate",
-        "type": "object"
-      },
-      "GenericAcceptedResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "accepted": {
-            "const": true,
-            "default": true,
-            "title": "Accepted",
-            "type": "boolean"
-          },
-          "development_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Development Code"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          }
-        },
-        "title": "GenericAcceptedResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1475,36 +1332,6 @@
           "source_asset"
         ],
         "title": "PagePreparationState",
-        "type": "object"
-      },
-      "PasswordResetConfirmRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "maxLength": 64,
-            "minLength": 6,
-            "title": "Code",
-            "type": "string"
-          },
-          "email": {
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email",
-            "type": "string"
-          },
-          "new_password": {
-            "maxLength": 128,
-            "minLength": 12,
-            "title": "New Password",
-            "type": "string"
-          }
-        },
-        "required": [
-          "email",
-          "code",
-          "new_password"
-        ],
-        "title": "PasswordResetConfirmRequest",
         "type": "object"
       },
       "Point": {
@@ -2452,130 +2279,6 @@
         "x-implementation-status": "live"
       }
     },
-    "/api/v1/access/email/resend": {
-      "post": {
-        "operationId": "livePostApiV1AccessEmailResendV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailOnlyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Resend Email",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
-    "/api/v1/access/email/verify": {
-      "post": {
-        "operationId": "livePostApiV1AccessEmailVerifyV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailCodeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Verify Email",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
-    "/api/v1/access/exchange-code": {
-      "post": {
-        "operationId": "livePostApiV1AccessExchangeCodeV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AccessExchangeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccessSession"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "summary": "Exchange",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
     "/api/v1/access/login": {
       "post": {
         "operationId": "livePostApiV1AccessLoginV1",
@@ -2663,92 +2366,6 @@
         "x-implementation-status": "live"
       }
     },
-    "/api/v1/access/recovery/confirm": {
-      "post": {
-        "operationId": "livePostApiV1AccessRecoveryConfirmV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Recovery Confirm",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
-    "/api/v1/access/recovery/request": {
-      "post": {
-        "operationId": "livePostApiV1AccessRecoveryRequestV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailOnlyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Recovery Request",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
     "/api/v1/access/register": {
       "post": {
         "operationId": "livePostApiV1AccessRegisterV1",
@@ -2767,7 +2384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountRegistrationResponse"
+                  "$ref": "#/components/schemas/AccessSession"
                 }
               }
             },

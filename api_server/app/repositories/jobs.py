@@ -248,6 +248,9 @@ class JobRepository:
             "prepared_asset_sha256",
             "page_revision",
             "pipeline_manifest_sha256",
+            "detector_name",
+            "detector_version",
+            "detector_config_json",
             "craft_detector_version",
             "craft_thresholds_json",
             "trocr_model_version",
@@ -286,7 +289,7 @@ class JobRepository:
         evidence: dict[str, object] | None = None,
         error_code: str | None = None,
     ) -> None:
-        if model_name not in {"craft", "trocr"} or status not in {"ready", "unavailable"}:
+        if model_name not in {"craft", "kraken", "trocr"} or status not in {"ready", "unavailable"}:
             raise ValueError("Invalid model readiness value")
         now = _iso(_now())
         payload = json.dumps(evidence, separators=(",", ":"), sort_keys=True) if evidence is not None else None

@@ -24,7 +24,7 @@ class RegionInput(BaseModel):
     id: str | None = None
     polygon: list[Point] = Field(min_length=4, max_length=4)
     reading_order: int = Field(ge=0, le=100_000)
-    source: Literal["craft", "manual", "adjusted"]
+    source: Literal["craft", "kraken", "manual", "adjusted"]
     flags: list[str] = Field(default_factory=list, max_length=32)
     detector_version: str | None = Field(default=None, max_length=128)
     detector_score: float | None = Field(default=None, ge=0, le=1)
@@ -39,6 +39,8 @@ class RegionInput(BaseModel):
             raise ValueError("polygon must have non-zero area")
         if self.source == "craft" and (self.detector_version is None or self.detector_score is None):
             raise ValueError("craft regions require detector provenance and score")
+        if self.source == "kraken" and self.detector_version is None:
+            raise ValueError("kraken regions require detector provenance")
         return self
 
 
@@ -72,7 +74,7 @@ class RegionResponse(BaseModel):
     polygon: list[Point]
     reading_order: int
     revision: int
-    source: Literal["craft", "manual", "adjusted"]
+    source: Literal["craft", "kraken", "manual", "adjusted"]
     flags: list[str]
     detector_version: str | None
     detector_score: float | None

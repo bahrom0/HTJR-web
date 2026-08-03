@@ -11,6 +11,7 @@ import gc
 import threading
 import time
 from collections import OrderedDict
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ import numpy as np
 from PIL import Image
 
 from app.ml.craft import CraftArtifactStatus, inspect_craft_artifacts
+from app.ml.cuda import configure_cuda_inference
 
 CRAFT_RUNTIME_VERSION = "craft_mlt_25k:runtime-v2"
 CRAFT_THRESHOLD_VERSION = "craft-thresholds-v1"
@@ -62,6 +64,13 @@ def _torch_modules() -> tuple[Any, Any, Any]:
     except ImportError as error:  # Defensive: worker reports an explicit state.
         raise CraftRuntimeError("craft_runtime_dependencies_missing") from error
     return torch, nn, models
+
+
+def _inference_context(torch: Any, device: Any) -> Any:
+    """Use Tensor Cores for CRAFT when the worker runs on NVIDIA CUDA."""
+    if getattr(device, "type", None) == "cuda":
+        return torch.autocast(device_type="cuda", dtype=torch.float16)
+    return nullcontext()
 
 
 def _build_craft_model() -> Any:
@@ -264,6 +273,8 @@ class CraftRuntime:
         if self.requested_device == "cuda" and not torch.cuda.is_available():
             raise CraftRuntimeError("craft_cuda_unavailable")
         self._device = torch.device("cuda" if use_cuda else "cpu")
+        if self._device.type == "cuda":
+            configure_cuda_inference(torch)
         assert status.weight_path is not None
         checkpoint = status.weight_path
         try:
@@ -286,7 +297,7 @@ class CraftRuntime:
         assert self._model is not None
         torch, _, _ = _torch_modules()
         started = time.perf_counter()
-        with self._lock, torch.inference_mode():
+        with self._lock, torch.inference_mode(), _inference_context(torch, self._device):
             sample = torch.zeros((1, 3, 64, 64), device=self._device)
             self._model(sample)
             if self._device.type == "cuda":
@@ -316,7 +327,7 @@ class CraftRuntime:
         normalized = (array - np.array([0.485, 0.456, 0.406], dtype=np.float32)) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
         tensor = torch.from_numpy(np.ascontiguousarray(normalized.transpose(2, 0, 1))).unsqueeze(0).to(self._device)
         started = time.perf_counter()
-        with self._lock, torch.inference_mode():
+        with self._lock, torch.inference_mode(), _inference_context(torch, self._device):
             output, _ = self._model(tensor)
             maps = torch.sigmoid(output[0]).detach().float().cpu().numpy()
             if self._device.type == "cuda":

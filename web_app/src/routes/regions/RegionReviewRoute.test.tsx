@@ -223,7 +223,7 @@ describe('RegionReviewRoute', () => {
     renderRoute();
 
     await screen.findByRole('button', { name: /Регион 1: CRAFT/ });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и подтвердить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать текст' }));
 
     await waitFor(() =>
       expect(confirmRegions).toHaveBeenCalledWith(pageId, 7, 'csrf-token', {
@@ -232,7 +232,7 @@ describe('RegionReviewRoute', () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent(`/result?jobId=${jobId}`),
+      expect(screen.getByTestId('location')).toHaveTextContent(`/processing?jobId=${jobId}`),
     );
   });
 
@@ -245,7 +245,7 @@ describe('RegionReviewRoute', () => {
 
     await screen.findByRole('button', { name: /Регион 1: CRAFT/ });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить область' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить области' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать текст' }));
 
     expect(await screen.findByText(/Версия страницы изменилась на сервере/)).toBeInTheDocument();
     await waitFor(() => expect(saveRegionDraft).toHaveBeenCalled());

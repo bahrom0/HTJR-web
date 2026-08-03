@@ -13,34 +13,9 @@
       }
     },
     "schemas": {
-      "AccessExchangeRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "maxLength": 64,
-            "minLength": 8,
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "AccessExchangeRequest",
-        "type": "object"
-      },
       "AccessSession": {
         "additionalProperties": false,
         "properties": {
-          "auth_method": {
-            "default": "access_code",
-            "enum": [
-              "account",
-              "access_code"
-            ],
-            "title": "Auth Method",
-            "type": "string"
-          },
           "authenticated": {
             "const": true,
             "default": true,
@@ -65,19 +40,12 @@
             "type": "string"
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AccountProfile"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
+            "$ref": "#/components/schemas/AccountProfile"
           }
         },
         "required": [
-          "expires_at"
+          "expires_at",
+          "user"
         ],
         "title": "AccessSession",
         "type": "object"
@@ -119,10 +87,6 @@
             "title": "Email",
             "type": "string"
           },
-          "email_verified": {
-            "title": "Email Verified",
-            "type": "boolean"
-          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -144,7 +108,6 @@
           "id",
           "email",
           "name",
-          "email_verified",
           "created_at",
           "updated_at"
         ],
@@ -179,37 +142,6 @@
           "password"
         ],
         "title": "AccountRegisterRequest",
-        "type": "object"
-      },
-      "AccountRegistrationResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "development_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Development Code"
-          },
-          "email": {
-            "title": "Email",
-            "type": "string"
-          },
-          "verification_expires_at": {
-            "format": "date-time",
-            "title": "Verification Expires At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "email",
-          "verification_expires_at"
-        ],
-        "title": "AccountRegistrationResponse",
         "type": "object"
       },
       "AccountSessionItem": {
@@ -639,6 +571,21 @@
         "title": "Document",
         "type": "object"
       },
+      "DocumentDeleteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "title": "DocumentDeleteRequest",
+        "type": "object"
+      },
       "DocumentList": {
         "additionalProperties": false,
         "properties": {
@@ -666,6 +613,22 @@
           "items"
         ],
         "title": "DocumentList",
+        "type": "object"
+      },
+      "DocumentListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DocumentListResponse",
         "type": "object"
       },
       "DocumentPatch": {
@@ -697,43 +660,225 @@
         "title": "DocumentPatch",
         "type": "object"
       },
-      "EmailCodeRequest": {
+      "DocumentPatchRequest": {
         "additionalProperties": false,
         "properties": {
-          "code": {
-            "maxLength": 64,
-            "minLength": 6,
-            "title": "Code",
-            "type": "string"
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
           },
-          "email": {
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email",
+          "title": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
             "type": "string"
           }
         },
         "required": [
-          "email",
-          "code"
+          "revision",
+          "title"
         ],
-        "title": "EmailCodeRequest",
+        "title": "DocumentPatchRequest",
         "type": "object"
       },
-      "EmailOnlyRequest": {
-        "additionalProperties": false,
+      "DocumentSummaryResponse": {
         "properties": {
-          "email": {
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email",
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "latest_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Job Id"
+          },
+          "page_count": {
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "preview_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Text"
+          },
+          "preview_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Url"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
             "type": "string"
           }
         },
         "required": [
-          "email"
+          "id",
+          "title",
+          "status",
+          "revision",
+          "page_count",
+          "created_at",
+          "updated_at"
         ],
-        "title": "EmailOnlyRequest",
+        "title": "DocumentSummaryResponse",
+        "type": "object"
+      },
+      "EditorConfirmRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 16,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 10000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "revision",
+          "idempotency_key"
+        ],
+        "title": "EditorConfirmRequest",
+        "type": "object"
+      },
+      "EditorDocumentResponse": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentSummaryResponse"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/EditorLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document",
+          "lines"
+        ],
+        "title": "EditorDocumentResponse",
+        "type": "object"
+      },
+      "EditorDraftRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 10000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "revision"
+        ],
+        "title": "EditorDraftRequest",
+        "type": "object"
+      },
+      "EditorLineResponse": {
+        "properties": {
+          "crop_url": {
+            "title": "Crop Url",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "page_id": {
+            "format": "uuid",
+            "title": "Page Id",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "raw_text": {
+            "title": "Raw Text",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "page_id",
+          "position",
+          "raw_text",
+          "text",
+          "status",
+          "revision",
+          "crop_url"
+        ],
+        "title": "EditorLineResponse",
         "type": "object"
       },
       "ExportArtifact": {
@@ -828,42 +973,6 @@
           "idempotency_key"
         ],
         "title": "ExportCreate",
-        "type": "object"
-      },
-      "GenericAcceptedResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "accepted": {
-            "const": true,
-            "default": true,
-            "title": "Accepted",
-            "type": "boolean"
-          },
-          "development_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Development Code"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          }
-        },
-        "title": "GenericAcceptedResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1223,36 +1332,6 @@
           "source_asset"
         ],
         "title": "PagePreparationState",
-        "type": "object"
-      },
-      "PasswordResetConfirmRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "maxLength": 64,
-            "minLength": 6,
-            "title": "Code",
-            "type": "string"
-          },
-          "email": {
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email",
-            "type": "string"
-          },
-          "new_password": {
-            "maxLength": 128,
-            "minLength": 12,
-            "title": "New Password",
-            "type": "string"
-          }
-        },
-        "required": [
-          "email",
-          "code",
-          "new_password"
-        ],
-        "title": "PasswordResetConfirmRequest",
         "type": "object"
       },
       "Point": {
@@ -1726,6 +1805,7 @@
           "source": {
             "enum": [
               "craft",
+              "kraken",
               "manual",
               "adjusted"
             ],
@@ -1856,6 +1936,7 @@
           "source": {
             "enum": [
               "craft",
+              "kraken",
               "manual",
               "adjusted"
             ],
@@ -2198,130 +2279,6 @@
         "x-implementation-status": "live"
       }
     },
-    "/api/v1/access/email/resend": {
-      "post": {
-        "operationId": "livePostApiV1AccessEmailResendV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailOnlyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Resend Email",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
-    "/api/v1/access/email/verify": {
-      "post": {
-        "operationId": "livePostApiV1AccessEmailVerifyV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailCodeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Verify Email",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
-    "/api/v1/access/exchange-code": {
-      "post": {
-        "operationId": "livePostApiV1AccessExchangeCodeV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AccessExchangeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccessSession"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "summary": "Exchange",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
     "/api/v1/access/login": {
       "post": {
         "operationId": "livePostApiV1AccessLoginV1",
@@ -2409,92 +2366,6 @@
         "x-implementation-status": "live"
       }
     },
-    "/api/v1/access/recovery/confirm": {
-      "post": {
-        "operationId": "livePostApiV1AccessRecoveryConfirmV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Recovery Confirm",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
-    "/api/v1/access/recovery/request": {
-      "post": {
-        "operationId": "livePostApiV1AccessRecoveryRequestV1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailOnlyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericAcceptedResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "$ref": "#/components/responses/ApiError"
-          },
-          "default": {
-            "$ref": "#/components/responses/ApiError"
-          }
-        },
-        "security": [
-          {
-            "CookieSession": []
-          }
-        ],
-        "summary": "Recovery Request",
-        "tags": [
-          "access"
-        ],
-        "x-implementation-status": "live"
-      }
-    },
     "/api/v1/access/register": {
       "post": {
         "operationId": "livePostApiV1AccessRegisterV1",
@@ -2513,7 +2384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountRegistrationResponse"
+                  "$ref": "#/components/schemas/AccessSession"
                 }
               }
             },
@@ -2674,17 +2545,45 @@
     },
     "/api/v1/documents": {
       "get": {
-        "operationId": "listDocumentsV1",
+        "operationId": "liveGetApiV1DocumentsV1",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentList"
+                  "$ref": "#/components/schemas/DocumentListResponse"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
           },
           "default": {
             "$ref": "#/components/responses/ApiError"
@@ -2695,11 +2594,11 @@
             "CookieSession": []
           }
         ],
-        "summary": "List owned documents",
+        "summary": "List Documents",
         "tags": [
           "documents"
         ],
-        "x-implementation-status": "planned"
+        "x-implementation-status": "live"
       },
       "post": {
         "operationId": "livePostApiV1DocumentsV1",
@@ -2785,7 +2684,7 @@
     },
     "/api/v1/documents/{document_id}": {
       "delete": {
-        "operationId": "deleteDocumentV1",
+        "operationId": "liveDeleteApiV1DocumentsDocumentIdV1",
         "parameters": [
           {
             "in": "path",
@@ -2795,13 +2694,29 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
           }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DocumentPatch"
+                "$ref": "#/components/schemas/DocumentDeleteRequest"
               }
             }
           },
@@ -2809,7 +2724,10 @@
         },
         "responses": {
           "204": {
-            "description": "Successful response"
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
           },
           "default": {
             "$ref": "#/components/responses/ApiError"
@@ -2820,14 +2738,14 @@
             "CookieSession": []
           }
         ],
-        "summary": "Move an owned document to trash",
+        "summary": "Delete Document",
         "tags": [
           "documents"
         ],
-        "x-implementation-status": "planned"
+        "x-implementation-status": "live"
       },
       "get": {
-        "operationId": "getDocumentV1",
+        "operationId": "liveGetApiV1DocumentsDocumentIdV1",
         "parameters": [
           {
             "in": "path",
@@ -2844,11 +2762,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Document"
+                  "$ref": "#/components/schemas/DocumentSummaryResponse"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
           },
           "default": {
             "$ref": "#/components/responses/ApiError"
@@ -2859,14 +2780,14 @@
             "CookieSession": []
           }
         ],
-        "summary": "Get an owned document",
+        "summary": "Get Document",
         "tags": [
           "documents"
         ],
-        "x-implementation-status": "planned"
+        "x-implementation-status": "live"
       },
       "patch": {
-        "operationId": "updateDocumentV1",
+        "operationId": "livePatchApiV1DocumentsDocumentIdV1",
         "parameters": [
           {
             "in": "path",
@@ -2876,13 +2797,29 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
           }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DocumentPatch"
+                "$ref": "#/components/schemas/DocumentPatchRequest"
               }
             }
           },
@@ -2893,11 +2830,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Document"
+                  "$ref": "#/components/schemas/DocumentSummaryResponse"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
           },
           "default": {
             "$ref": "#/components/responses/ApiError"
@@ -2908,11 +2848,55 @@
             "CookieSession": []
           }
         ],
-        "summary": "Update an owned document",
+        "summary": "Patch Document",
         "tags": [
           "documents"
         ],
-        "x-implementation-status": "planned"
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/documents/{document_id}/editor": {
+      "get": {
+        "operationId": "liveGetApiV1DocumentsDocumentIdEditorV1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorDocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Get Document Editor",
+        "tags": [
+          "documents"
+        ],
+        "x-implementation-status": "live"
       }
     },
     "/api/v1/documents/{document_id}/exports": {
@@ -3428,6 +3412,48 @@
         "summary": "Record Manual Fallback",
         "tags": [
           "jobs"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/line-crops/{crop_id}/preview": {
+      "get": {
+        "operationId": "liveGetApiV1LineCropsCropIdPreviewV1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "crop_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Preview Line Crop",
+        "tags": [
+          "documents"
         ],
         "x-implementation-status": "live"
       }
@@ -4424,6 +4450,150 @@
           "text-lines"
         ],
         "x-implementation-status": "planned"
+      }
+    },
+    "/api/v1/text-lines/{line_id}/confirm": {
+      "post": {
+        "operationId": "livePostApiV1TextLinesLineIdConfirmV1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Confirm Line Api V1 Text Lines  Line Id  Confirm Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Confirm Line",
+        "tags": [
+          "documents"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/text-lines/{line_id}/draft": {
+      "put": {
+        "operationId": "livePutApiV1TextLinesLineIdDraftV1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Save Line Draft Api V1 Text Lines  Line Id  Draft Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Save Line Draft",
+        "tags": [
+          "documents"
+        ],
+        "x-implementation-status": "live"
       }
     },
     "/api/v1/text-lines/{text_line_id}": {

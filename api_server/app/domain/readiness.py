@@ -20,6 +20,7 @@ class ReadinessService:
     def __init__(self, database: Database, settings: Settings) -> None:
         self._jobs = JobRepository(database)
         self._stale_seconds = settings.worker_lease_seconds
+        self._craft_enabled = settings.craft_enabled
 
     def check(self) -> Readiness:
         if self._jobs.worker_is_fresh(stale_seconds=self._stale_seconds):
@@ -30,11 +31,13 @@ class ReadinessService:
         worker = self.check()
         if not worker.is_ready:
             return worker
-        detector = craft_status()
-        if not detector.ready:
-            return Readiness(is_ready=False, code=detector.code)
-        if not self._jobs.model_is_ready("craft", stale_seconds=self._stale_seconds):
-            return Readiness(is_ready=False, code="craft_warmup_unavailable")
+        detector_name = "craft" if self._craft_enabled else "kraken"
+        if self._craft_enabled:
+            detector = craft_status()
+            if not detector.ready:
+                return Readiness(is_ready=False, code=detector.code)
+        if not self._jobs.model_is_ready(detector_name, stale_seconds=self._stale_seconds):
+            return Readiness(is_ready=False, code=f"{detector_name}_warmup_unavailable")
         return Readiness(is_ready=True, code="ready")
 
     def pipeline_check(self) -> Readiness:

@@ -18,15 +18,19 @@ echo   start.bat stop     Stop the local stack
 exit /b 2
 
 :start_stack
-echo Starting Tajik HTR Studio...
-echo API, worker and frontend run in the background without extra windows.
+echo.
+echo ==================================================
+echo   Tajik HTR Studio - local development launcher
+echo ==================================================
+echo Starting API, persistent ML worker, and frontend...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%WORKSPACE_ROOT%ops\start-local.ps1" -ReadinessTimeoutSeconds 60
 if errorlevel 1 goto failed
 
 echo.
-echo Tajik HTR Studio is ready:
-echo http://127.0.0.1:5173
+echo [OPEN] http://127.0.0.1:5173
+echo [TIP]  Run "start.bat status" to inspect API, CUDA and worker status.
 start "" "http://127.0.0.1:5173"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%WORKSPACE_ROOT%ops\wait-for-ctrl-h.ps1"
 exit /b 0
 
 :status_stack

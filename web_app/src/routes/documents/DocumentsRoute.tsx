@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { deleteDocument, getDocuments, type DocumentItem } from '@entities/document';
 import { useAccess } from '@shared/access/AccessProvider';
-import { Button, Dialog, Icon, Status } from '@shared/ui';
+import { Button, Dialog, Icon, LoadingState, Status } from '@shared/ui';
 
 function statusLabel(status: DocumentItem['status']) {
   return { draft: 'Черновик', processing: 'Обрабатывается', review: 'Нужна проверка', ready: 'Готов', failed: 'Ошибка' }[status];
@@ -58,7 +58,12 @@ export default function DocumentsRoute() {
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти документ" />
       </label>
 
-      {state === 'loading' ? <div className="new-empty-card" role="status"><p>Загружаем документы…</p></div> : null}
+      {state === 'loading' ? (
+        <LoadingState
+          title="Загружаем документы"
+          description={query ? 'Ищем документы по вашему запросу.' : 'Получаем список документов.'}
+        />
+      ) : null}
       {state === 'error' ? <div className="new-empty-card" role="alert"><p>Не удалось получить документы. Проверьте сервер и повторите.</p></div> : null}
       {state === 'ready' && documents.length === 0 ? (
         <div className="new-empty-card">

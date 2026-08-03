@@ -30,15 +30,10 @@ class RevisionMutation(ContractModel):
     revision: int = Field(ge=1)
 
 
-class AccessExchangeRequest(ContractModel):
-    code: str = Field(min_length=8, max_length=64)
-
-
 class AccountProfile(ContractModel):
     id: UUID
     email: str = Field(min_length=3, max_length=254)
     name: str = Field(min_length=2, max_length=100)
-    email_verified: bool
     created_at: datetime
     updated_at: datetime
 
@@ -47,8 +42,7 @@ class AccessSession(ContractModel):
     authenticated: Literal[True] = True
     expires_at: datetime
     csrf_token: str | None = None
-    auth_method: Literal["account", "access_code"] = "access_code"
-    user: AccountProfile | None = None
+    user: AccountProfile
 
 
 class AccountRegisterRequest(ContractModel):
@@ -60,31 +54,6 @@ class AccountRegisterRequest(ContractModel):
 class AccountLoginRequest(ContractModel):
     email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=1, max_length=128)
-
-
-class EmailCodeRequest(ContractModel):
-    email: str = Field(min_length=3, max_length=254)
-    code: str = Field(min_length=6, max_length=64)
-
-
-class EmailOnlyRequest(ContractModel):
-    email: str = Field(min_length=3, max_length=254)
-
-
-class PasswordResetConfirmRequest(EmailCodeRequest):
-    new_password: str = Field(min_length=12, max_length=128)
-
-
-class AccountRegistrationResponse(ContractModel):
-    email: str
-    verification_expires_at: datetime
-    development_code: str | None = None
-
-
-class GenericAcceptedResponse(ContractModel):
-    accepted: Literal[True] = True
-    development_code: str | None = None
-    expires_at: datetime | None = None
 
 
 class ProfilePatch(ContractModel):

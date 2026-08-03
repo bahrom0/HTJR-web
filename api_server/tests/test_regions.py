@@ -24,16 +24,17 @@ def client(tmp_path, monkeypatch):
         settings,
         database_path=tmp_path / "studio.sqlite3",
         storage_root=tmp_path / "assets",
-        access_code_enabled=True,
     )
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as current:
-        code, _ = current.app.state.access.issue_code("regions-tests")
-        exchange = current.post("/api/v1/access/exchange-code", json={"code": code})
-        assert exchange.status_code == 200
-        yield current, exchange.json()["csrf_token"]
+        register = current.post(
+            "/api/v1/access/register",
+            json={"email": "regions@example.test", "name": "Regions User", "password": "correct horse battery"},
+        )
+        assert register.status_code == 201
+        yield current, register.json()["csrf_token"]
 
 
 def _page(client: TestClient, csrf: str) -> str:

@@ -84,10 +84,24 @@ class Database:
                 if migration.name in applied:
                     continue
                 version = migration.name.replace("'", "''")
-                connection.executescript(
-                    f"BEGIN IMMEDIATE;\n{migration.read_text(encoding='utf-8')}\n"
-                    f"INSERT INTO schema_migrations(version) VALUES ('{version}');\nCOMMIT;"
-                )
+                migration_sql = migration.read_text(encoding="utf-8")
+                foreign_keys_off = migration_sql.lstrip().startswith("-- migrate: foreign_keys_off")
+                if foreign_keys_off:
+                    connection.execute("PRAGMA foreign_keys = OFF")
+                try:
+                    connection.executescript(
+                        f"BEGIN IMMEDIATE;\n{migration_sql}\n"
+                        f"INSERT INTO schema_migrations(version) VALUES ('{version}');\nCOMMIT;"
+                    )
+                    if foreign_keys_off:
+                        violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+                        if violations:
+                            raise sqlite3.IntegrityError(
+                                f"Foreign key violations after migration {migration.name}: {len(violations)}"
+                            )
+                finally:
+                    if foreign_keys_off:
+                        connection.execute("PRAGMA foreign_keys = ON")
         except Exception:
             connection.rollback()
             raise

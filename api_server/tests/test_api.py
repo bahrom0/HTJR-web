@@ -34,11 +34,11 @@ def test_health_fixture_is_the_contract() -> None:
 
 
 def test_validation_error_is_content_free_error_envelope() -> None:
-    submitted_secret = "S" * 65
+    submitted_password = "S" * 129
     with TestClient(create_app()) as client:
         response = client.post(
-            "/api/v1/access/exchange-code",
-            json={"code": submitted_secret},
+            "/api/v1/access/login",
+            json={"email": "validation@example.test", "password": submitted_password},
             headers={"X-Request-ID": "validation-contract-test"},
         )
 
@@ -49,7 +49,7 @@ def test_validation_error_is_content_free_error_envelope() -> None:
         "retryable": False,
         "request_id": "validation-contract-test",
     }
-    assert submitted_secret not in response.text
+    assert submitted_password not in response.text
     assert "detail" not in response.json()
 
 

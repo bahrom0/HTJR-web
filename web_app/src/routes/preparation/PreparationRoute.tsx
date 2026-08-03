@@ -27,7 +27,7 @@ import {
   savePreparationDraft,
 } from '@features/preparation/persistence';
 import { useAccess } from '@shared/access/AccessProvider';
-import { Button, Card } from '@shared/ui';
+import { Button, Card, LoadingState } from '@shared/ui';
 
 const initialCorners: NonNullable<PreparationRecipe['perspective']> = [
   { x: 0.04, y: 0.04 },
@@ -294,7 +294,10 @@ export default function PreparationRoute() {
   if (!state) {
     return (
       <main className="preparation-page" id="main-content" tabIndex={-1}>
-        <p role="status">Загружаем состояние подготовки…</p>
+        <LoadingState
+          title="Загружаем подготовку"
+          description="Получаем изображение и сохранённые параметры подготовки."
+        />
         {message ? <p role="alert">{message}</p> : null}
       </main>
     );

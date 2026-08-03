@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import sqlite3
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,7 +12,7 @@ from app.core.database import Database
 from app.core.settings import settings
 from app.core.storage import FileStorage
 from app.repositories.documents import DocumentRepository, RevisionConflict
-from app.services.access import AccessDenied, AccessService, RateLimited
+from app.services.access import AccessDenied, AccessService
 
 
 @pytest.fixture
@@ -21,30 +21,33 @@ def configured(tmp_path):
         settings,
         database_path=tmp_path / "studio.sqlite3",
         storage_root=tmp_path / "assets",
-        access_attempt_limit=2,
-        access_attempt_window_seconds=300,
-        access_code_enabled=True,
+        account_attempt_limit=2,
+        account_attempt_window_seconds=300,
     )
     database = Database(configured_settings.database_path)
     database.migrate()
     return configured_settings, database
 
 
-def create_session(configured) -> tuple[AccessService, str, str]:
+def create_session(configured, label: str = "tests") -> tuple[AccessService, str, str]:
     configured_settings, database = configured
     service = AccessService(database, configured_settings)
-    code, _ = service.issue_code("tests")
-    grant = service.exchange(code, "127.0.0.1")
-    return service, grant.session_id, grant.token
+    grant = service.register(
+        f"{label}-{uuid4().hex}@example.test",
+        "correct horse battery",
+        "Test User",
+        "Test browser",
+    )
+    return service, service.authenticate(grant.token)["owner_id"], grant.token
 
 
 def test_migrations_are_idempotent_and_survive_restart(configured) -> None:
     configured_settings, database = configured
-    service, session_id, _ = create_session(configured)
-    document = DocumentRepository(database).create(session_id, "Манускрипт")
+    service, owner_id, token = create_session(configured)
+    document = DocumentRepository(database).create(owner_id, "Manuscript")
     Database(configured_settings.database_path).migrate()
-    assert DocumentRepository(Database(configured_settings.database_path)).get(session_id, document.id).title == "Манускрипт"
-    assert service.authenticate(_)["id"] == session_id
+    assert DocumentRepository(Database(configured_settings.database_path)).get(owner_id, document.id).title == "Manuscript"
+    assert service.authenticate(token)["owner_id"] == owner_id
 
 
 def test_transaction_rolls_back_and_foreign_keys_reject_orphan(configured) -> None:
@@ -62,10 +65,8 @@ def test_transaction_rolls_back_and_foreign_keys_reject_orphan(configured) -> No
 
 def test_revision_conflict_soft_delete_and_ownership(configured) -> None:
     _, database = configured
-    _, owner, _ = create_session(configured)
-    service = AccessService(database, configured[0])
-    code, _ = service.issue_code()
-    other = service.exchange(code, "other").session_id
+    _, owner, _ = create_session(configured, "owner")
+    _, other, _ = create_session(configured, "other")
     repository = DocumentRepository(database)
     document = repository.create(owner, "A")
     updated = repository.update(owner, document.id, 1, title="B")
@@ -100,50 +101,39 @@ def test_cascade_removes_document_children(configured) -> None:
         assert connection.execute("SELECT COUNT(*) FROM pages WHERE id='page'").fetchone()[0] == 0
 
 
-def test_code_replay_expiry_revoke_csrf_and_rate_limit(configured) -> None:
+def test_account_session_csrf_rotation_and_revoke(configured) -> None:
     configured_settings, database = configured
-    service = AccessService(database, configured_settings)
-    code, _ = service.issue_code()
-    grant = service.exchange(code, "client")
-    with pytest.raises(AccessDenied):
-        service.exchange(code, "another-client")
-    session = service.authenticate(grant.token)
+    service, owner, token = create_session(configured)
+    session = service.authenticate(token)
     with pytest.raises(AccessDenied):
         service.validate_csrf(session, "wrong")
-    service.validate_csrf(session, grant.csrf_token)
-    service.revoke(grant.token)
+    csrf = service.rotate_csrf(token)
+    session = service.authenticate(token)
+    service.validate_csrf(session, csrf)
+    service.revoke(token)
     with pytest.raises(AccessDenied):
-        service.authenticate(grant.token)
-
-    expired_code, _ = service.issue_code()
-    with database.transaction(immediate=True) as connection:
-        connection.execute("UPDATE access_codes SET expires_at=? WHERE consumed_at IS NULL", ((datetime.now(UTC) - timedelta(seconds=1)).isoformat(),))
-    with pytest.raises(AccessDenied):
-        service.exchange(expired_code, "expired")
-
-    for _ in range(configured_settings.access_attempt_limit):
-        with pytest.raises(AccessDenied):
-            service.exchange("BAD-CODE-0000", "attacker")
-    with pytest.raises(RateLimited):
-        service.exchange("BAD-CODE-0000", "attacker")
+        service.authenticate(token)
+    with database.connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM user_sessions WHERE user_id=?", (owner,)).fetchone()[0] == 1
 
 
 def test_access_http_cookie_csrf_logout_and_release_flags(configured, monkeypatch) -> None:
-    configured_settings, database = configured
+    configured_settings, _ = configured
     release_settings = replace(configured_settings, cookie_secure=True)
-    service = AccessService(database, release_settings)
-    code, _ = service.issue_code()
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", release_settings)
     with TestClient(main_module.create_app()) as client:
-        exchange = client.post("/api/v1/access/exchange-code", json={"code": code})
-        assert exchange.status_code == 200
-        cookie = exchange.headers["set-cookie"]
+        register = client.post(
+            "/api/v1/access/register",
+            json={"email": "cookie@example.test", "name": "Cookie User", "password": "correct horse battery"},
+        )
+        assert register.status_code == 201
+        cookie = register.headers["set-cookie"]
         assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=strict" in cookie
         assert "Path=/" in cookie and "Path=/api/v1" not in cookie
-        csrf_token = exchange.json()["csrf_token"]
-        client.cookies.set(release_settings.cookie_name, exchange.cookies[release_settings.cookie_name])
+        csrf_token = register.json()["csrf_token"]
+        client.cookies.set(release_settings.cookie_name, register.cookies[release_settings.cookie_name])
         failed = client.post("/api/v1/access/logout", headers={"X-CSRF-Token": "wrong"})
         assert failed.status_code == 401
         logout = client.post("/api/v1/access/logout", headers={"X-CSRF-Token": csrf_token})

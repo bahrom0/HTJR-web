@@ -20,8 +20,6 @@ router = APIRouter(prefix="/me", tags=["account"])
 
 
 def _require_account(session: AuthenticatedSession) -> str:
-    if session.user_id is None or session.auth_method != "account":
-        raise ApiError(403, "account_required", "Sign in with an account to use this endpoint.")
     return session.user_id
 
 
@@ -30,7 +28,6 @@ def _profile(value: dict) -> AccountProfile:
         id=value["id"],
         email=value["email"],
         name=value["name"],
-        email_verified=value["email_verified_at"] is not None,
         created_at=value["created_at"],
         updated_at=value["updated_at"],
     )

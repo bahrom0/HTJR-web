@@ -1,0 +1,21 @@
+INFO:     127.0.0.1:58675 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "GET /styles.css?v=20260730-5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53739 - "GET /app.js?v=20260730-5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53739 - "GET /api/images?limit=2000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56621 - "GET /api/images/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "GET /api/images/2/content?v=64 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "GET /api/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "PUT /api/images/2/annotations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "GET /api/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "PUT /api/images/2/annotations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "GET /api/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "PUT /api/images/2/annotations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "GET /api/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "PUT /api/images/2/annotations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "GET /api/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "PUT /api/images/2/annotations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "GET /api/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53933 - "PUT /api/images/2/annotations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53933 - "GET /api/stats HTTP/1.1" 200 OK

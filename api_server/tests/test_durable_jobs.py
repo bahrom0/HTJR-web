@@ -199,16 +199,18 @@ def test_job_api_enforces_csrf_idempotency_and_ownership(tmp_path: Path, monkeyp
         settings,
         database_path=tmp_path / "api.sqlite3",
         storage_root=tmp_path / "assets",
-        access_code_enabled=True,
     )
     import app.main as main_module
 
     monkeypatch.setattr(main_module, "settings", configured)
     with TestClient(main_module.create_app()) as client:
-        code, _ = client.app.state.access.issue_code("owner-one")
-        exchange = client.post("/api/v1/access/exchange-code", json={"code": code})
-        csrf = exchange.json()["csrf_token"]
-        owner = client.app.state.access.authenticate(client.cookies.get(configured.cookie_name))["id"]
+        register = client.post(
+            "/api/v1/access/register",
+            json={"email": "owner-one@example.test", "name": "Owner One", "password": "correct horse battery"},
+        )
+        csrf = register.json()["csrf_token"]
+        owner_cookie = register.cookies[configured.cookie_name]
+        owner = client.app.state.access.authenticate(owner_cookie)["owner_id"]
         _, pages = _seed(client.app.state.database, owner=owner, page_count=1)
         page = pages[0]
         denied = client.post(f"/api/v1/pages/{page}/recognition-jobs", json={}, headers={"Idempotency-Key": "api-job-key-00001"})
@@ -219,9 +221,11 @@ def test_job_api_enforces_csrf_idempotency_and_ownership(tmp_path: Path, monkeyp
         assert duplicate.status_code == 201 and duplicate.json()["duplicate"] is True
         job_id = created.json()["id"]
 
-        other_code, _ = client.app.state.access.issue_code("owner-two")
-        other_exchange = client.post("/api/v1/access/exchange-code", json={"code": other_code})
+        other_register = client.post(
+            "/api/v1/access/register",
+            json={"email": "owner-two@example.test", "name": "Owner Two", "password": "correct horse battery"},
+        )
         assert client.get(f"/api/v1/jobs/{job_id}").status_code == 404
-        client.cookies.set(configured.cookie_name, exchange.cookies.get(configured.cookie_name))
+        client.cookies.set(configured.cookie_name, owner_cookie)
         cancelled = client.post(f"/api/v1/jobs/{job_id}/cancel", headers={"X-CSRF-Token": csrf})
         assert cancelled.status_code == 200 and cancelled.json()["state"] == "cancelled"

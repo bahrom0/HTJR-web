@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='utf-8'?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15">
+  <Metadata>
+    <Creator>Tajik HTR Kraken Annotator</Creator>
+    <Created>2026-07-30T16:52:43+00:00</Created>
+    <LastChange>2026-07-30T16:52:43+00:00</LastChange>
+  </Metadata>
+  <Page imageFilename="../images/000003_20260730_172929.jpg" imageWidth="3000" imageHeight="4000">
+    <TextRegion id="region_000003" type="TextRegion">
+      <Coords points="603,495 2360,495 2360,1731 603,1731" />
+      <TextLine id="line_000003_0000" custom="structure {type:DefaultLine;}">
+        <Coords points="646,642 1682,642 1682,795 646,795" />
+        <Baseline points="666,767 1661,767" />
+      </TextLine>
+      <TextLine id="line_000003_0001" custom="structure {type:DefaultLine;}">
+        <Coords points="671,495 1146,495 1146,654 671,654" />
+        <Baseline points="681,625 1137,625" />
+      </TextLine>
+      <TextLine id="line_000003_0002" custom="structure {type:DefaultLine;}">
+        <Coords points="1715,605 2258,605 2258,781 1715,781" />
+        <Baseline points="1726,749 2247,749" />
+      </TextLine>
+      <TextLine id="line_000003_0003" custom="structure {type:DefaultLine;}">
+        <Coords points="642,836 1340,836 1340,947 642,947" />
+        <Baseline points="656,927 1326,927" />
+      </TextLine>
+      <TextLine id="line_000003_0004" custom="structure {type:DefaultLine;}">
+        <Coords points="1392,812 2319,812 2319,935 1392,935" />
+        <Baseline points="1411,913 2300,913" />
+      </TextLine>
+      <TextLine id="line_000003_0005" custom="structure {type:DefaultLine;}">
+        <Coords points="630,976 2041,976 2041,1103 630,1103" />
+        <Baseline points="658,1070 2013,1070" />
+      </TextLine>
+      <TextLine id="line_000003_0006" custom="structure {type:DefaultLine;}">
+        <Coords points="634,1110 2307,1110 2307,1264 634,1264" />
+        <Baseline points="668,1225 2274,1225" />
+      </TextLine>
+      <TextLine id="line_000003_0007" custom="structure {type:DefaultLine;}">
+        <Coords points="663,1266 2360,1266 2360,1423 663,1423" />
+        <Baseline points="697,1395 2326,1395" />
+      </TextLine>
+      <TextLine id="line_000003_0008" custom="structure {type:DefaultLine;}">
+        <Coords points="625,1406 2213,1406 2213,1568 625,1568" />
+        <Baseline points="657,1535 2181,1535" />
+      </TextLine>
+      <TextLine id="line_000003_0009" custom="structure {type:DefaultLine;}">
+        <Coords points="603,1594 1868,1594 1868,1731 603,1731" />
+        <Baseline points="628,1701 1843,1701" />
+      </TextLine>
+    </TextRegion>
+  </Page>
+</PcGts>

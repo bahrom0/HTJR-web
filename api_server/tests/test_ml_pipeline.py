@@ -310,11 +310,13 @@ def test_confirmed_regions_create_padded_immutable_line_crops(pipeline) -> None:
             prepared,
             padding_fraction=0.08,
         )
-    # CRAFT's first fake polygon is x=8..190 in a 240px page.  Padding is
-    # normalized to page geometry, so the immutable crop is wider than the
-    # unpadded 182px detector box and safely bounded by the source image.
-    assert 182 < crop.width <= 240
-    assert 26 < crop.height <= 120
+    # CRAFT's first fake polygon is x=8..190 in a 240px page. Padding is
+    # relative to that region, so the immutable crop has a small context
+    # margin without adding 8% of the entire page on every side.
+    assert (crop.width, crop.height) == (205, 32)
+
+    # Recognition must never mutate the confirmed geometry shown in review.
+    assert recognition.run_regions(owner, run_id) == snapshot_regions
 
     current_revision, _, current_regions = RegionRepository(database).list(owner, page_id)
     RegionRepository(database).replace(

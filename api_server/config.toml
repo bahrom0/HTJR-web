@@ -1,0 +1,18 @@
+# Local project configuration. Environment variables may temporarily override
+# these values for diagnostics, but this file is the normal source of truth.
+
+[ml]
+# false: use the Kraken BLLA line segmenter through the local WSL sidecar.
+# true: use the preserved legacy CRAFT detector and its grouping pipeline.
+CRAFT = false
+
+# true: use NVIDIA CUDA when PyTorch detects a compatible GPU.
+# false: run all recognition strictly on the CPU.
+CUDA = true
+
+kraken_endpoint = "http://127.0.0.1:8011"
+kraken_timeout_seconds = 180
+
+# RTX 4050 Laptop (6 GB): four line crops fit alongside the FP16 TrOCR model.
+# Lower this only if the worker reports CUDA out-of-memory errors.
+trocr_batch_size = 4
