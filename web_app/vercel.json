@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://api.tjocr.com/api/v1/:path*"
+      "destination": "https://api.tajocr.com/api/v1/:path*"
     },
     {
       "source": "/(.*)",
