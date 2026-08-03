@@ -4,8 +4,9 @@ export interface DocumentItem {
   pageCount: number;
   createdAt: string;
   updatedAt: string;
-  status: 'draft' | 'completed' | 'processing';
-  isFavorite: boolean;
+  revision: number;
+  status: 'draft' | 'processing' | 'review' | 'ready' | 'failed';
+  latestJobId?: string;
+  previewUrl?: string;
   previewText?: string;
-  rawText?: string;
 }

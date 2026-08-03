@@ -104,14 +104,17 @@ function regionLabel(region: Region, position: number): string {
   const source =
     region.source === 'craft'
       ? 'CRAFT'
-      : region.source === 'manual'
-        ? 'ручная область'
-        : 'исправленная область';
+      : region.source === 'kraken'
+        ? 'Kraken'
+        : region.source === 'manual'
+          ? 'ручная область'
+          : 'исправленная область';
   return `Регион ${position + 1}: ${source}`;
 }
 
 function sourceLabel(source: Region['source']): string {
   if (source === 'craft') return 'CRAFT';
+  if (source === 'kraken') return 'Kraken';
   if (source === 'manual') return 'ручной';
   return 'исправлен';
 }
@@ -721,7 +724,7 @@ export default function RegionReviewRoute() {
     }
     if (jobId && (!job || job.state !== 'awaiting_region_review')) {
       setMessage(
-        'CRAFT-задача ещё не перешла к проверке областей. Обновите состояние перед подтверждением.',
+        'Задача детектора ещё не перешла к проверке областей. Обновите состояние перед подтверждением.',
       );
       return;
     }
@@ -764,7 +767,7 @@ export default function RegionReviewRoute() {
     if (jobId) {
       const refreshedJob = await getJobSnapshot(jobId);
       if (refreshedJob.ok) setJob(refreshedJob.value);
-      navigate(`/result?jobId=${encodeURIComponent(jobId)}`, { replace: true });
+      navigate(`/processing?jobId=${encodeURIComponent(jobId)}`, { replace: true });
     }
   }
 
@@ -791,7 +794,7 @@ export default function RegionReviewRoute() {
       <section className="regions-page regions-page--empty" tabIndex={-1}>
         <Card>
           <h1>Выберите страницу для проверки областей</h1>
-          <p>Сначала подготовьте изображение и поставьте CRAFT-задачу в очередь.</p>
+          <p>Сначала подготовьте изображение и поставьте задачу детектора в очередь.</p>
           <Link className="ui-button ui-button--primary" to="/capture">
             Добавить страницу
           </Link>
@@ -804,7 +807,7 @@ export default function RegionReviewRoute() {
     return (
       <section className="regions-page regions-page--empty" tabIndex={-1}>
         <p role="status">
-          {loading ? 'Загружаем области CRAFT…' : 'Подготавливаем проверку областей…'}
+          {loading ? 'Загружаем области детектора…' : 'Подготавливаем проверку областей…'}
         </p>
         {message ? <p role="alert">{message}</p> : null}
         {!loading && message ? (
@@ -826,16 +829,16 @@ export default function RegionReviewRoute() {
       : null;
   const jobStatus = job
     ? job.state === 'awaiting_region_review'
-      ? 'CRAFT завершил поиск строк: подтвердите области, чтобы продолжить распознавание.'
+        ? 'Детектор завершил поиск строк: подтвердите области, чтобы продолжить распознавание.'
       : `Задача: ${job.stage}. Серверное состояние будет обновлено автоматически.`
-    : 'Проверяйте реальные области, возвращённые сервером CRAFT.';
+    : 'Проверяйте реальные области, возвращённые активным детектором.';
 
   return (
     <section className="regions-page" tabIndex={-1} onKeyDown={handleShortcuts}>
       <header className="page-heading regions-heading">
         <div>
           <h1>Проверка строк</h1>
-          <p>Исправьте области CRAFT перед распознаванием текста.</p>
+          <p>Исправьте области детектора перед распознаванием текста.</p>
         </div>
         <div className="preparation-heading__actions">
           <Link
@@ -889,7 +892,7 @@ export default function RegionReviewRoute() {
       ) : null}
 
       <div className="regions-layout">
-        <section className="regions-workspace" aria-label="Изображение и области CRAFT">
+        <section className="regions-workspace" aria-label="Изображение и области детектора">
           <div
             className={`regions-canvas ${drawMode ? 'regions-canvas--drawing' : ''}`}
             ref={viewport}
@@ -1079,7 +1082,7 @@ export default function RegionReviewRoute() {
                           {region.flags.length ? region.flags.join(', ') : 'Без review flags'}
                         </span>
                       </span>
-                      <Badge tone={region.source === 'craft' ? 'info' : 'warning'}>
+                <Badge tone={region.source === 'craft' || region.source === 'kraken' ? 'info' : 'warning'}>
                         {sourceLabel(region.source)}
                       </Badge>
                     </button>
@@ -1088,7 +1091,7 @@ export default function RegionReviewRoute() {
               </ol>
             ) : (
               <p className="regions-empty-list">
-                CRAFT ещё не вернул строк или области были удалены вручную.
+                Детектор ещё не вернул строк или области были удалены вручную.
               </p>
             )}
           </Card>

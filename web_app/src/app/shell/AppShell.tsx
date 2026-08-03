@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect } from 'react';
 import { NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 
 import { motionTransition, useAccessibleMotion } from '@shared/motion';
 import { PwaUpdateNotice } from '@shared/pwa/PwaUpdateNotice';
@@ -12,6 +12,7 @@ export function AppShell() {
   const location = useLocation();
   const isOnline = useNetworkStatus();
   const isAccessRoute = location.pathname.startsWith('/access');
+  const isProcessingRoute = location.pathname === '/processing';
   const canAnimate = useAccessibleMotion();
 
   useLayoutEffect(() => {
@@ -25,12 +26,16 @@ export function AppShell() {
   }, [isOnline, location.pathname]);
 
   return (
-    <div className={`app-shell ${isAccessRoute ? 'app-shell--access' : ''}`}>
+    <div
+      className={`app-shell ${isAccessRoute ? 'app-shell--access' : ''} ${
+        isProcessingRoute ? 'app-shell--immersive' : ''
+      }`}
+    >
       <a className="skip-link" href="#main-content">
         К основному содержимому
       </a>
 
-      {!isAccessRoute ? (
+      {!isAccessRoute && !isProcessingRoute ? (
         <header className="new-navigation">
           <nav className="new-navigation__primary" aria-label="Основная навигация">
             <NavLink to="/" end>
@@ -54,18 +59,15 @@ export function AppShell() {
       ) : null}
 
       <main id="main-content" tabIndex={-1}>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={location.pathname}
-            className="route-stage"
-            initial={canAnimate ? { opacity: 0, y: 14, filter: 'blur(4px)' } : false}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            exit={canAnimate ? { opacity: 0, y: -8 } : undefined}
-            transition={motionTransition.enter}
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={location.pathname}
+          className="route-stage"
+          initial={canAnimate ? { opacity: 0 } : false}
+          animate={{ opacity: 1 }}
+          transition={motionTransition.enter}
+        >
+          <Outlet />
+        </motion.div>
       </main>
 
       <PwaUpdateNotice />

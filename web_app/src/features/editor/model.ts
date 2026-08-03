@@ -1,20 +1,14 @@
-export type LineBlockStatus = 'unverified' | 'verified' | 'edited';
-
-export interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+export type LineBlockStatus = 'unverified' | 'confirmed' | 'edited';
 
 export interface LineBlock {
   id: string;
   lineNumber: number;
   rawText: string;
   editedText: string;
-  confidence: number;
+  revision: number;
+  cropUrl: string;
+  pageId: string;
   status: LineBlockStatus;
-  box?: BoundingBox;
 }
 
 export interface EditorHistoryState {

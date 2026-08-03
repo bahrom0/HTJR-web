@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 
 import {
   createJobSubscription,
@@ -77,6 +77,10 @@ export default function ResultRoute() {
     ? `/regions?pageId=${encodeURIComponent(stream.snapshot.pageId)}&jobId=${encodeURIComponent(jobId)}`
     : '/regions';
 
+  if (stream?.snapshot && !progress?.isTerminal) {
+    return <Navigate to={`/processing?jobId=${encodeURIComponent(jobId)}`} replace />;
+  }
+
   return (
     <main className="result-page" id="main-content" tabIndex={-1}>
       <header className="page-heading result-heading">
@@ -144,7 +148,7 @@ export default function ResultRoute() {
               <p>Сопоставьте распознанные строки с изображением и исправьте ошибки модели.</p>
               <Link
                 className="ui-button ui-button--primary"
-                to={`/editor?jobId=${encodeURIComponent(jobId)}`}
+                to={`/editor?documentId=${encodeURIComponent(result.documentId)}`}
               >
                 <Icon name="sparkles" /> Открыть редактор
               </Link>

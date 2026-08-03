@@ -1,122 +1,61 @@
-import { DocumentItem } from './model';
+import { request, type ApiResult } from '@shared/api/client';
 
-const STORAGE_KEY = 'htr_documents';
+import type { DocumentItem } from './model';
 
-const MOCK_DOCUMENTS: DocumentItem[] = [
-  {
-    id: 'doc-1',
-    title: 'Рукопись Рудаки - Страница 1',
-    pageCount: 3,
-    createdAt: '2026-07-20T10:00:00.000Z',
-    updatedAt: '2026-07-24T15:30:00.000Z',
-    status: 'completed',
-    isFavorite: true,
-    previewText: 'Ай дареғо ки он чунон чашмон, Безиё гаштаанду торикон...',
-    rawText: 'Ай дареғо ки он чунон чашмон\nБезиё гаштаанду торикон\nЗ-он ки зулфи чу мушк будаш сиёҳ\nГашт чун ширу шуд бидуни гуноҳ',
-  },
-  {
-    id: 'doc-2',
-    title: 'Архивный документ 1928 г.',
-    pageCount: 1,
-    createdAt: '2026-07-22T11:15:00.000Z',
-    updatedAt: '2026-07-22T11:20:00.000Z',
-    status: 'draft',
-    isFavorite: false,
-    previewText: 'Протокол заседания комиссии по ликвидации неграмотности...',
-    rawText: 'Протокол заседания комиссии по ликвидации неграмотности в Душанбе.\nДата: 14 мая 1928 года.\nПрисутствовали: член президиума...',
-  },
-  {
-    id: 'doc-3',
-    title: 'Поэма Саъди "Гулистон"',
-    pageCount: 12,
-    createdAt: '2026-07-23T09:00:00.000Z',
-    updatedAt: '2026-07-25T08:00:00.000Z',
-    status: 'processing',
-    isFavorite: false,
-    previewText: 'Минат худоро азза ва ҷалл ки тоъаташ муҷиби қурбат аст...',
-    rawText: 'Минат худоро азза ва ҷалл ки тоъаташ муҷиби қурбат аст ва ба шукр андараш мазиди неъмат...',
-  },
-];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-export function getDocuments(): DocumentItem[] {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return MOCK_DOCUMENTS;
+function parseDocument(value: unknown): DocumentItem | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.title !== 'string' ||
+    typeof value.status !== 'string' ||
+    typeof value.revision !== 'number' ||
+    typeof value.page_count !== 'number' ||
+    typeof value.created_at !== 'string' ||
+    typeof value.updated_at !== 'string'
+  ) {
+    return null;
   }
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DOCUMENTS));
-      return MOCK_DOCUMENTS;
-    }
-    const parsed = JSON.parse(stored);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DOCUMENTS));
-    return MOCK_DOCUMENTS;
-  } catch (error) {
-    console.error('Failed to read documents from localStorage:', error);
-    return MOCK_DOCUMENTS;
-  }
+  if (!['draft', 'processing', 'review', 'ready', 'failed'].includes(value.status)) return null;
+  return {
+    id: value.id,
+    title: value.title,
+    revision: value.revision,
+    pageCount: value.page_count,
+    createdAt: value.created_at,
+    updatedAt: value.updated_at,
+    status: value.status as DocumentItem['status'],
+    ...(typeof value.latest_job_id === 'string' ? { latestJobId: value.latest_job_id } : {}),
+    ...(typeof value.preview_url === 'string' ? { previewUrl: value.preview_url } : {}),
+    ...(typeof value.preview_text === 'string' ? { previewText: value.preview_text } : {}),
+  };
 }
 
-export function getDocumentById(id: string): DocumentItem | undefined {
-  const documents = getDocuments();
-  return documents.find((doc) => doc.id === id);
+function parseDocumentList(value: unknown): DocumentItem[] | null {
+  if (!isRecord(value) || !Array.isArray(value.items)) return null;
+  const items = value.items.map(parseDocument);
+  return items.every((item): item is DocumentItem => item !== null) ? items : null;
 }
 
-export function saveDocuments(documents: DocumentItem[]): void {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(documents));
-  } catch (error) {
-    console.error('Failed to save documents to localStorage:', error);
-  }
+export function getDocuments(query = '', signal?: AbortSignal): Promise<ApiResult<DocumentItem[]>> {
+  const search = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
+  return request(`/documents${search}`, parseDocumentList, { signal });
 }
 
-export function toggleFavoriteDocument(id: string): DocumentItem[] {
-  const documents = getDocuments();
-  const updated = documents.map((doc) =>
-    doc.id === id
-      ? {
-          ...doc,
-          isFavorite: !doc.isFavorite,
-          updatedAt: new Date().toISOString(),
-        }
-      : doc,
-  );
-  saveDocuments(updated);
-  return updated;
+export function getDocument(id: string, signal?: AbortSignal): Promise<ApiResult<DocumentItem>> {
+  return request(`/documents/${encodeURIComponent(id)}`, parseDocument, { signal });
 }
 
-export function deleteDocument(id: string): DocumentItem[] {
-  const documents = getDocuments();
-  const updated = documents.filter((doc) => doc.id !== id);
-  saveDocuments(updated);
-  return updated;
-}
-
-export function searchDocuments(query: string): DocumentItem[] {
-  const documents = getDocuments();
-  if (!query.trim()) return documents;
-  const q = query.toLowerCase().trim();
-  return documents.filter(
-    (doc) =>
-      doc.title.toLowerCase().includes(q) ||
-      (doc.previewText && doc.previewText.toLowerCase().includes(q)),
-  );
-}
-
-export function saveDocument(document: DocumentItem): DocumentItem[] {
-  const documents = getDocuments();
-  const existingIndex = documents.findIndex((d) => d.id === document.id);
-  let updated: DocumentItem[];
-  if (existingIndex >= 0) {
-    updated = [...documents];
-    updated[existingIndex] = document;
-  } else {
-    updated = [document, ...documents];
-  }
-  saveDocuments(updated);
-  return updated;
+export function deleteDocument(
+  document: Pick<DocumentItem, 'id' | 'revision'>,
+  csrfToken: string,
+): Promise<ApiResult<true>> {
+  return request(`/documents/${encodeURIComponent(document.id)}`, () => true, {
+    method: 'DELETE',
+    csrfToken,
+    json: { revision: document.revision },
+  });
 }

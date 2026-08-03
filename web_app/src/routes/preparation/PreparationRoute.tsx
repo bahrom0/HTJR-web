@@ -609,7 +609,7 @@ export default function PreparationRoute() {
             ) : null}
             {state.confirmed ? (
               <p className="preparation-confirmed" role="status">
-                Рецепт подтверждён. Запустите durable-задачу CRAFT, чтобы получить области строк для
+                Рецепт подтверждён. Запустите задачу детектора, чтобы получить области строк для
                 проверки.
               </p>
             ) : null}
