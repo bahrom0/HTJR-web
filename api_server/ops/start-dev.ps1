@@ -10,7 +10,9 @@ param(
     [int]$ReadinessTimeoutSeconds = 30,
 
     [ValidateRange(30, 1800)]
-    [int]$ModelWarmupTimeoutSeconds = 900
+    [int]$ModelWarmupTimeoutSeconds = 900,
+
+    [string]$WebDistPath = ''
 )
 
 Set-StrictMode -Version Latest
@@ -47,6 +49,13 @@ $krakenLauncher = Join-Path $workspaceRoot 'kraken_sidecar\run-wsl.ps1'
 $krakenOutputLogPath = Join-Path $stateDirectory 'kraken.stdout.log'
 $krakenErrorLogPath = Join-Path $stateDirectory 'kraken.stderr.log'
 $krakenPort = 8011
+$webDist = $null
+if (-not [String]::IsNullOrWhiteSpace($WebDistPath)) {
+    $webDist = (Resolve-Path -LiteralPath $WebDistPath -ErrorAction Stop).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $webDist 'index.html') -PathType Leaf)) {
+        throw "Compiled web client is missing index.html: $webDist"
+    }
+}
 
 function Resolve-ProjectInterpreter {
     $candidates = @(
@@ -238,6 +247,27 @@ function Get-CudaSummary {
     }
 }
 
+function Get-ResourceSummary {
+    $parts = [System.Collections.Generic.List[string]]::new()
+    try {
+        $samples = Get-Counter '\Memory\Committed Bytes', '\Memory\Commit Limit', '\Memory\Available MBytes' -ErrorAction Stop |
+            Select-Object -ExpandProperty CounterSamples
+        $committedGiB = [math]::Round((($samples | Where-Object Path -match 'committed bytes').CookedValue / 1GB), 2)
+        $limitGiB = [math]::Round((($samples | Where-Object Path -match 'commit limit').CookedValue / 1GB), 2)
+        $availableMiB = [math]::Round((($samples | Where-Object Path -match 'available mbytes').CookedValue), 0)
+        $parts.Add("commit=$committedGiB/$limitGiB GiB; available_ram=$availableMiB MiB")
+    }
+    catch {}
+    try {
+        $gpu = & nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv,noheader 2>$null | Select-Object -First 1
+        if (-not [String]::IsNullOrWhiteSpace([string]$gpu)) {
+            $parts.Add("vram=$gpu")
+        }
+    }
+    catch {}
+    return ($parts -join '; ')
+}
+
 if ($Action -eq 'Stop') {
     Stop-TrackedProcesses
     exit 0
@@ -270,6 +300,10 @@ if ($Action -eq 'Status') {
     ) {
         Write-Output "[i] CUDA: $($state.cuda_summary)"
     }
+    $resourceSummary = Get-ResourceSummary
+    if (-not [String]::IsNullOrWhiteSpace($resourceSummary)) {
+        Write-Output "[i] Resources: $resourceSummary"
+    }
     exit $(if ($isRunning) { 0 } else { 1 })
 }
 
@@ -280,7 +314,10 @@ if ($null -ne $priorState) {
     $apiRunning = Test-TrackedProcess -ProcessId ([int]$priorState.api_pid) -ExpectedInterpreter ([string]$priorState.python)
     $workerRunning = Test-TrackedProcess -ProcessId ([int]$priorState.worker_pid) -ExpectedInterpreter ([string]$priorState.python)
     $krakenReady = -not $krakenSelected -or (Test-KrakenReadiness)
-    if ($apiRunning -and $workerRunning -and $krakenReady -and (Test-ApiReadiness -ApiPort ([int]$priorState.port))) {
+    $priorWebDist = $(if ($priorState.PSObject.Properties.Name -contains 'web_dist') { [string]$priorState.web_dist } else { '' })
+    $requestedWebDist = $(if ($null -eq $webDist) { '' } else { [string]$webDist })
+    $webModeMatches = [String]::Equals($priorWebDist, $requestedWebDist, [StringComparison]::OrdinalIgnoreCase)
+    if ($apiRunning -and $workerRunning -and $krakenReady -and $webModeMatches -and (Test-ApiReadiness -ApiPort ([int]$priorState.port))) {
         Write-Output "Tajik HTR Studio API and worker are already running on http://127.0.0.1:$($priorState.port)."
         exit 0
     }
@@ -337,7 +374,24 @@ try {
     }
 
     Write-Output '[1/4] API: starting local server...'
-    $apiProcess = Start-Process -FilePath $python -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', [string]$Port) -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $apiOutputLogPath -RedirectStandardError $apiErrorLogPath -PassThru
+    $previousWebDist = $env:HTR_WEB_DIST
+    try {
+        if ($null -eq $webDist) {
+            Remove-Item Env:HTR_WEB_DIST -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:HTR_WEB_DIST = $webDist
+        }
+        $apiProcess = Start-Process -FilePath $python -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', [string]$Port) -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $apiOutputLogPath -RedirectStandardError $apiErrorLogPath -PassThru
+    }
+    finally {
+        if ($null -eq $previousWebDist) {
+            Remove-Item Env:HTR_WEB_DIST -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:HTR_WEB_DIST = $previousWebDist
+        }
+    }
     # Let the API finish database migrations before the worker opens the same
     # SQLite file.  Starting both processes simultaneously can make a cold
     # launch race on schema creation look like a model-startup failure.
@@ -368,6 +422,7 @@ try {
         kraken_enabled = $krakenSelected
         kraken_pid = $(if ($null -eq $krakenProcess) { 0 } else { $krakenProcess.Id })
         cuda_summary = $cuda
+        web_dist = $(if ($null -eq $webDist) { '' } else { $webDist })
         port = $Port
         started_at = (Get-Date).ToUniversalTime().ToString('o')
     } | ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding UTF8
@@ -395,6 +450,10 @@ try {
     }
     Write-Progress -Activity 'Tajik HTR Studio: warming ML models' -Completed
     Write-Output '[OK] ML models: ready and retained in worker memory.'
+    $resourceSummary = Get-ResourceSummary
+    if (-not [String]::IsNullOrWhiteSpace($resourceSummary)) {
+        Write-Output "[i] Resources after warmup: $resourceSummary"
+    }
 
     Write-Output "[OK] Backend stack: ready at http://127.0.0.1:$Port"
     exit 0

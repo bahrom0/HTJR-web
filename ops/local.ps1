@@ -178,14 +178,15 @@ function Test-ErrorEnvelopeRoundTrip {
 
     $client = [System.Net.Http.HttpClient]::new()
     try {
-        $content = [System.Net.Http.StringContent]::new('{"code":"short"}', [Text.Encoding]::UTF8, 'application/json')
-        $response = $client.PostAsync("http://127.0.0.1:$Port/api/v1/access/exchange-code", $content).GetAwaiter().GetResult()
+        $password = [string]::new('x', 129)
+        $content = [System.Net.Http.StringContent]::new("{`"email`":`"launcher@example.invalid`",`"password`":`"$password`"}", [Text.Encoding]::UTF8, 'application/json')
+        $response = $client.PostAsync("http://127.0.0.1:$Port/api/v1/access/login", $content).GetAwaiter().GetResult()
         $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
         return ([int]$response.StatusCode -eq 422) -and
             $body.code -eq 'request_validation_failed' -and
             $body.retryable -eq $false -and
             -not [String]::IsNullOrWhiteSpace([string]$body.request_id) -and
-            -not ($response.Content.ReadAsStringAsync().GetAwaiter().GetResult() -match 'short')
+            -not ($response.Content.ReadAsStringAsync().GetAwaiter().GetResult() -match $password)
     }
     catch {
         return $false

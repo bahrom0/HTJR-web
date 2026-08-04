@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -18,6 +20,7 @@ from app.services.access import AccessService
 from app.domain.readiness import ReadinessService
 from app.core.storage import FileStorage
 from app.repositories.jobs import JobRepository
+from app.web_static import mount_web_client
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +38,7 @@ async def lifespan(application: FastAPI):
     yield
 
 
-def create_app() -> FastAPI:
+def create_app(*, web_dist: Path | None = None) -> FastAPI:
     application = FastAPI(title="Tajik HTR Studio API", version="1.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 
     @application.middleware("http")
@@ -77,7 +80,17 @@ def create_app() -> FastAPI:
 
     application.include_router(api_router)
     application.include_router(events_router)
+    configured_web_dist = web_dist or _web_dist_from_environment()
+    if configured_web_dist is not None:
+        mount_web_client(application, configured_web_dist)
     return application
+
+
+def _web_dist_from_environment() -> Path | None:
+    configured = os.environ.get("HTR_WEB_DIST")
+    if not configured:
+        return None
+    return Path(configured).resolve()
 
 
 app = create_app()
