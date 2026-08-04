@@ -54,8 +54,8 @@ export default function AccessRoute() {
             description: 'Документы и результаты будут привязаны к вашему аккаунту.',
           }
         : {
-            title: 'Tajik HTR\nStudio',
-            description: 'Войдите, чтобы продолжить работу с рукописями.',
+            title: '\u0412\u0445\u043e\u0434 \u0432 TJOCR',
+            description: '\u041f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430 \u0434\u043b\u044f \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0432\u0430\u043d\u0438\u044f \u0442\u0430\u0434\u0436\u0438\u043a\u0441\u043a\u043e\u0433\u043e \u0442\u0435\u043a\u0441\u0442\u0430.',
           },
     [mode],
   );
@@ -90,13 +90,27 @@ export default function AccessRoute() {
 
   return (
     <section className="new-auth" aria-labelledby="access-title">
-      <motion.div
-        className="new-auth__card"
+      <div className="new-auth__shell">
+        <motion.aside
+          className="new-auth__visual"
+          aria-hidden="true"
+          initial={canAnimate ? { opacity: 0, x: -18, scale: 1.015 } : false}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={motionTransition.enter}
+        >
+          <img src="/auth-hero-v2.png" alt="" />
+          <span className="new-auth__visual-wash" />
+        </motion.aside>
+        <motion.div
+          className="new-auth__card"
         initial={canAnimate ? { opacity: 0, y: 18, scale: 0.985 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={motionTransition.enter}
-      >
-        <p className="new-auth__brand">Tajik HTR Studio</p>
+        >
+        <div className="new-auth__brand-logo">
+          <img className="new-auth__brand-logo-light" src="/tjocr-logo-auth-light.png" alt="TJOCR" />
+          <img className="new-auth__brand-logo-dark" src="/tjocr-logo-auth-dark.png" alt="" />
+        </div>
         <h1 id="access-title">
           {copy.title.split('\n').map((line) => (
             <span key={line}>{line}</span>
@@ -110,6 +124,8 @@ export default function AccessRoute() {
               label="Электронная почта"
               type="email"
               autoComplete="email"
+              placeholder="email@example.com"
+              className="new-auth__input"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -118,6 +134,8 @@ export default function AccessRoute() {
               label="Пароль"
               type="password"
               autoComplete="current-password"
+              placeholder="Пароль"
+              className="new-auth__input"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               error={error}
@@ -132,6 +150,8 @@ export default function AccessRoute() {
             <Field
               label="Ваше имя"
               autoComplete="name"
+              placeholder="Ваше имя"
+              className="new-auth__input"
               value={name}
               onChange={(event) => setName(event.target.value)}
               required
@@ -140,6 +160,8 @@ export default function AccessRoute() {
               label="Электронная почта"
               type="email"
               autoComplete="email"
+              placeholder="email@example.com"
+              className="new-auth__input"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -148,6 +170,8 @@ export default function AccessRoute() {
               label="Пароль"
               type="password"
               autoComplete="new-password"
+              placeholder="Пароль"
+              className="new-auth__input"
               minLength={12}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -168,7 +192,8 @@ export default function AccessRoute() {
             <Link to="/access">Уже есть аккаунт</Link>
           )}
         </nav>
-      </motion.div>
+        </motion.div>
+      </div>
     </section>
   );
 }
