@@ -10,16 +10,40 @@ export function DocumentEditor() {
   const { documentId } = useParams();
   const navigate = useNavigate();
   const documents = useAppStore(state => state.documents);
+  const updateDocument = useAppStore(state => state.updateDocument);
   const doc = documents.find(d => d.id === documentId);
-  
-  const [lines, setLines] = useState([
-    { id: 1, original: "Дар ибтидои асри", current: "Дар ибтидои асри", status: 'confirmed' },
-    { id: 2, original: "бистум дар Осиёи", current: "бистум дар Осиёи", status: 'doubtful' },
-    { id: 3, original: "Миёна воқеаҳои", current: "Миёна воқеаҳои", status: 'doubtful' }
-  ]);
 
-  const [selectedLineId, setSelectedLineId] = useState(2);
-  const selectedLine = lines.find(l => l.id === selectedLineId) || lines[0];
+  const [lines, setLines] = useState(() =>
+    (doc?.recognizedLines || []).map(line => ({
+      id: line.id,
+      original: line.text,
+      current: line.text,
+      status: 'doubtful',
+    }))
+  );
+  const [selectedLineId, setSelectedLineId] = useState(lines[0]?.id || '');
+  const selectedIndex = Math.max(0, lines.findIndex(line => line.id === selectedLineId));
+  const selectedLine = lines[selectedIndex];
+
+  const saveLines = (nextLines: typeof lines) => {
+    setLines(nextLines);
+    if (documentId) {
+      updateDocument(documentId, {
+        rawText: nextLines.map(line => line.current).join('\n'),
+        recognizedLines: nextLines.map((line, index) => ({ id: line.id, position: index + 1, text: line.current })),
+      });
+    }
+  };
+
+  const downloadText = () => {
+    const blob = new Blob([lines.map(line => line.current).join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = `${doc?.name || 'tajik-htr'}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Reveal className="flex flex-col gap-4 md:gap-8 min-h-[calc(100vh-120px)] md:h-[calc(100vh-180px)]">
@@ -31,7 +55,7 @@ export function DocumentEditor() {
         </div>
         <div className="flex items-center gap-2">
            <AnimatedButton onClick={() => navigate('/documents')} className="button-secondary px-3 py-1.5 md:px-5 md:py-2 text-xs md:text-sm min-h-[38px] md:min-h-[46px]">{t('save')}</AnimatedButton>
-           <AnimatedButton className="button-primary px-3 py-1.5 md:px-5 md:py-2 text-xs md:text-sm min-h-[38px] md:min-h-[46px] flex items-center gap-1.5"><Download className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('download')}</AnimatedButton>
+           <AnimatedButton onClick={downloadText} className="button-primary px-3 py-1.5 md:px-5 md:py-2 text-xs md:text-sm min-h-[38px] md:min-h-[46px] flex items-center gap-1.5"><Download className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('download')}</AnimatedButton>
         </div>
       </div>
       
@@ -42,13 +66,13 @@ export function DocumentEditor() {
            <div className="w-full h-full flex flex-col items-center justify-center p-2 relative">
              <div className="w-full max-w-lg bg-[#f8f5ee] dark:bg-[#22201c] text-[#2c261e] dark:text-[#ece6da] rounded-xl shadow-md border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3 relative overflow-hidden">
                 <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-1.5 text-[10px] opacity-60 font-mono">
-                   <span>LINE {selectedLine.id} REGION PREVIEW</span>
+                   <span>LINE {selectedIndex + 1} REGION PREVIEW</span>
                    <span>CROP ZOOM 2.0x</span>
                 </div>
                 
                 <div className="py-4 px-3 bg-black/5 dark:bg-white/5 rounded-lg border border-primary/40 relative">
                    <div className="font-serif italic text-base sm:text-xl md:text-2xl tracking-wide text-primary text-center select-none">
-                      "{selectedLine.original}"
+                      "{selectedLine?.original || doc?.rawText || ''}"
                    </div>
                    <div className="absolute top-1 right-2 text-[9px] font-sans bg-primary/20 text-primary px-1.5 py-0.5 rounded">
                       ORIGINAL SCAN
@@ -57,7 +81,7 @@ export function DocumentEditor() {
 
                 <div className="flex justify-between items-center text-[10px] opacity-40 font-mono pt-1">
                    <span>CONFIDENCE: 99.2%</span>
-                   <span>LINE {selectedLine.id} OF {lines.length}</span>
+                   <span>LINE {selectedIndex + 1} OF {lines.length}</span>
                 </div>
              </div>
            </div>
@@ -86,7 +110,7 @@ export function DocumentEditor() {
                    <input 
                      type="text" 
                      value={line.current}
-                     onChange={(e) => setLines(lines.map(l => l.id === line.id ? { ...l, current: e.target.value } : l))}
+                     onChange={(e) => saveLines(lines.map(l => l.id === line.id ? { ...l, current: e.target.value } : l))}
                      className="w-full bg-transparent outline-none font-medium text-sm md:text-base focus:ring-1 focus:ring-primary/40 rounded px-1 py-0.5"
                    />
                  </StaggerItem>
@@ -94,9 +118,9 @@ export function DocumentEditor() {
             </StaggerContainer>
 
             <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/5 gap-2">
-              <AnimatedButton className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0" onClick={() => setSelectedLineId(Math.max(1, selectedLineId - 1))}><ChevronLeft className="w-4 h-4"/></AnimatedButton>
-              <AnimatedButton className="button-secondary flex-1 py-2 text-xs md:text-sm min-h-[36px] md:min-h-[42px] text-center justify-center" onClick={() => setLines(lines.map(l => l.id === selectedLineId ? { ...l, status: 'confirmed' } : l))}>{t('confirmLine')}</AnimatedButton>
-              <AnimatedButton className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0" onClick={() => setSelectedLineId(Math.min(lines.length, selectedLineId + 1))}><ChevronRight className="w-4 h-4"/></AnimatedButton>
+              <AnimatedButton className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0" onClick={() => setSelectedLineId(lines[Math.max(0, selectedIndex - 1)]?.id || '')}><ChevronLeft className="w-4 h-4"/></AnimatedButton>
+              <AnimatedButton className="button-secondary flex-1 py-2 text-xs md:text-sm min-h-[36px] md:min-h-[42px] text-center justify-center" onClick={() => saveLines(lines.map(l => l.id === selectedLineId ? { ...l, status: 'confirmed' } : l))}>{t('confirmLine')}</AnimatedButton>
+              <AnimatedButton className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0" onClick={() => setSelectedLineId(lines[Math.min(lines.length - 1, selectedIndex + 1)]?.id || '')}><ChevronRight className="w-4 h-4"/></AnimatedButton>
             </div>
           </div>
         </div>
@@ -104,4 +128,3 @@ export function DocumentEditor() {
     </Reveal>
   );
 }
-

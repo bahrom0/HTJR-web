@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/api/v1/:path*",
-      "destination": "https://api.tajocr.com/api/v1/:path*"
+      "source": "/api/:path*",
+      "destination": "/api/index?path=:path*"
     },
     {
       "source": "/(.*)",

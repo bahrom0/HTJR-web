@@ -10,6 +10,7 @@ import {
 
 import {
   getAccessSession,
+  getAnonymousSessionToken,
   loginAccount,
   logoutAccessSession,
   registerAccount,
@@ -37,26 +38,40 @@ export function AccessProvider({ children }: Readonly<{ children: ReactNode }>) 
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [user, setUser] = useState<AccountProfile | null>(null);
 
-  const clear = useCallback(() => {
-    setExpiresAt(null);
-    setCsrfToken(null);
-    setUser(null);
-    setState('anonymous');
-  }, []);
-
   const reconnect = useCallback(async () => {
     setState('checking');
-    const session = await getAccessSession();
-    if (!session.ok) {
-      clear();
-      return;
+    try {
+      const session = await getAccessSession();
+      if (session.ok) {
+        const csrf = await refreshCsrfToken();
+        setExpiresAt(session.value.expiresAt);
+        setCsrfToken(csrf.ok ? (csrf.value.csrfToken ?? null) : null);
+        setUser(session.value.user);
+        setState('authenticated');
+        return;
+      }
+    } catch {
+      // continue to anonymous session fallback
     }
-    const csrf = await refreshCsrfToken();
-    setExpiresAt(session.value.expiresAt);
-    setCsrfToken(csrf.ok ? (csrf.value.csrfToken ?? null) : null);
-    setUser(session.value.user);
+
+    // Seamless anonymous session without registration
+    const anonToken = getAnonymousSessionToken();
+    setUser({
+      id: anonToken,
+      name: 'Пользователь',
+      email: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setExpiresAt(new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000).toISOString());
+    setCsrfToken(null);
     setState('authenticated');
-  }, [clear]);
+  }, []);
+
+  const clear = useCallback(() => {
+    localStorage.removeItem('htr_anonymous_token');
+    void reconnect();
+  }, [reconnect]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void reconnect(), 0);

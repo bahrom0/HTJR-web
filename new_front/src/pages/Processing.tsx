@@ -42,6 +42,8 @@ export function Processing() {
         step: 'result',
         status: 'ready',
         updatedAt: new Date().toISOString(),
+        rawText: result.raw_text,
+        recognizedLines: result.lines,
       });
 
       // Navigate to document result view

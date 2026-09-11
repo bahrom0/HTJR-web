@@ -13,7 +13,8 @@ export function getOrCreateSessionId(): string {
   return id;
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+// The deployed UI and API always share the same Vercel origin.
+const API_BASE = '';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const sessionId = getOrCreateSessionId();
@@ -64,6 +65,7 @@ export interface ApiDocument {
 export interface UploadResult {
   document_id: string;
   page_id: string;
+  storage_key: string;
   asset: {
     id: string;
     media_type: string;
@@ -86,13 +88,7 @@ export interface RecognitionResult {
 
 export const api = {
   async listDocuments(): Promise<ApiDocument[]> {
-    try {
-      const res = await request<{ items: ApiDocument[] }>('/api/v1/documents');
-      return res.items || [];
-    } catch (err) {
-      console.warn('Backend listDocuments failed, fallback to local store', err);
-      return [];
-    }
+    return request<ApiDocument[]>('/api/v1/documents');
   },
 
   async getDocument(documentId: string): Promise<any> {
@@ -126,11 +122,17 @@ export const api = {
   },
 
   async recognizeDocument(documentId: string, pageId: string = '1'): Promise<RecognitionResult> {
+    const cached = JSON.parse(localStorage.getItem('htr-studio-storage') || '{}');
+    const document = cached?.state?.documents?.find((item: { id: string }) => item.id === documentId);
+    if (!document?.storageKey) {
+      throw new Error('Изображение документа отсутствует в локальном кеше. Загрузите его заново.');
+    }
     return request<RecognitionResult>(`/api/v1/documents/${documentId}/pages/${pageId}/recognize`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ storage_key: document.storageKey }),
     });
   },
 

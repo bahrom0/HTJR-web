@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
@@ -25,10 +24,30 @@ from app.core.database import Database
 from app.core.logging import configure_logging
 from app.core.settings import settings
 from app.core.storage import FileStorage
-from app.ml.craft_runtime import DEFAULT_THRESHOLDS, CraftDetection, CraftRuntime, CraftRuntimeError
 from app.ml.gemini_runtime import GeminiOcrRuntime, GeminiPageResult, GeminiRuntimeError
-from app.ml.kraken_runtime import KrakenDetection, KrakenRuntime, KrakenRuntimeError
-from app.ml.trocr_runtime import TrocrGeneration, TrocrRuntime, TrocrRuntimeError
+
+# Lightweight fallback stubs for cloud / Gemini-only execution
+class CraftRuntimeError(RuntimeError): pass
+class CraftRuntime: pass
+class CraftDetection: pass
+DEFAULT_THRESHOLDS: dict[str, float] = {}
+
+class KrakenRuntimeError(RuntimeError): pass
+class KrakenRuntime: pass
+class KrakenDetection: pass
+
+class TrocrRuntimeError(RuntimeError): pass
+class TrocrRuntime: pass
+class TrocrGeneration: pass
+
+if settings.ocr_provider != "gemini":
+    try:
+        from app.ml.craft_runtime import DEFAULT_THRESHOLDS, CraftDetection, CraftRuntime, CraftRuntimeError
+        from app.ml.kraken_runtime import KrakenDetection, KrakenRuntime, KrakenRuntimeError
+        from app.ml.trocr_runtime import TrocrGeneration, TrocrRuntime, TrocrRuntimeError
+    except ImportError:
+        pass
+
 from app.repositories.jobs import JobRepository, LostLease
 from app.repositories.recognition import (
     RecognitionInputInvalid,
@@ -127,6 +146,7 @@ def _normalised_kraken_quad(
     points = np.asarray(boundary, dtype=np.float32)
     if points.ndim != 2 or points.shape[0] < 3 or points.shape[1] != 2:
         raise ValueError("kraken_boundary_invalid")
+    import cv2
     rectangle = cv2.minAreaRect(points)
     quad = cv2.boxPoints(rectangle)
     center = quad.mean(axis=0)
@@ -1440,9 +1460,15 @@ def _parse_arguments() -> argparse.Namespace:
 
 def run() -> None:
     configure_logging()
-    database = Database(settings.database_path)
-    database.migrate()
-    storage = FileStorage(settings.storage_root)
+    if settings.supabase_url and settings.supabase_key:
+        from app.core.supabase_database import SupabaseDatabase
+        from app.core.supabase_storage import SupabaseStorage
+        database = SupabaseDatabase(settings.supabase_url, settings.supabase_key)
+        storage = SupabaseStorage(settings.supabase_url, settings.supabase_key, settings.supabase_bucket)
+    else:
+        database = Database(settings.database_path)
+        database.migrate()
+        storage = FileStorage(settings.storage_root)
     models_root = Path(__file__).resolve().parents[2] / "models"
     worker_id = f"worker-{uuid4()}"
     started_at = _now()

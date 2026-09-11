@@ -13,6 +13,9 @@ export interface Document {
   updatedAt: string;
   pageCount: number;
   thumbnail?: string;
+  storageKey?: string;
+  rawText?: string;
+  recognizedLines?: Array<{ id: string; position: number; text: string }>;
   step: 'prepare' | 'regions' | 'processing' | 'result';
 }
 

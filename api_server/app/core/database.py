@@ -62,6 +62,12 @@ class Database:
             connection.close()
 
     def migrate(self) -> None:
+        from app.core.settings import settings
+        if settings.supabase_url and settings.supabase_key:
+            import logging
+            logging.getLogger(__name__).info("Supabase PostgreSQL active. Local SQLite migrations skipped.")
+            return
+
         connection = self.connect()
         try:
             connection.execute(

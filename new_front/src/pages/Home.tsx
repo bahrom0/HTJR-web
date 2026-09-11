@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../lib/i18n';
-import { useAppStore, Document } from '../lib/store';
-import { api } from '../lib/api';
-import { Plus, ArrowRight, FileText, Loader2 } from 'lucide-react';
+import { useAppStore } from '../lib/store';
+import { Plus, ArrowRight, FileText } from 'lucide-react';
 import { Reveal, StaggerContainer, StaggerItem } from '../components/Animations';
 import { motion } from 'motion/react';
 
@@ -12,41 +10,8 @@ const MotionLink = motion.create(Link);
 export function Home() {
   const { t, language } = useTranslation();
   const documents = useAppStore(state => state.documents);
-  const setDocuments = useAppStore(state => state.setDocuments);
-  const [loading, setLoading] = useState(false);
 
   const isRu = language === 'ru';
-
-  // Request documents ONLY ONCE when mounting the dashboard
-  useEffect(() => {
-    let cancelled = false;
-    async function loadDocs() {
-      try {
-        setLoading(true);
-        const serverDocs = await api.listDocuments();
-        if (!cancelled && serverDocs && serverDocs.length > 0) {
-          const mapped: Document[] = serverDocs.map(d => ({
-            id: d.id,
-            name: d.title || 'Untitled document',
-            status: d.status,
-            updatedAt: d.updated_at || d.created_at || new Date().toISOString(),
-            pageCount: d.page_count || 1,
-            thumbnail: d.preview_url,
-            step: d.status === 'ready' ? 'result' : 'prepare',
-          }));
-          setDocuments(mapped);
-        }
-      } catch (err) {
-        console.warn('Could not fetch documents from server:', err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    loadDocs();
-    return () => {
-      cancelled = true;
-    };
-  }, [setDocuments]);
 
   const recentDocs = documents.slice(0, 4);
 
@@ -77,7 +42,6 @@ export function Home() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-light">{t('recentDocuments')}</h2>
-            {loading && <Loader2 className="w-4 h-4 animate-spin opacity-50" />}
           </div>
           {documents.length > 0 && (
             <MotionLink whileTap={{ scale: 0.96 }} to="/documents" className="text-sm opacity-60 hover:opacity-100 flex items-center gap-2 transition-opacity">

@@ -5,15 +5,14 @@
   "buildCommand": "cd new_front && bun run build",
   "outputDirectory": "new_front/dist",
   "functions": {
-    "api/index.py": {
-      "maxDuration": 300,
-      "excludeFiles": "{api_server/tests/**,annotation_app/**,android/**,android_app_instructions/**,docs/**,final_product/**,HTR v2 CER/**,kraken_sidecar/**,raw_dataset/**,web_app/**,web_app_instructions/**,.tmp/**,.docx_*_qa/**,**/*.pptx,**/*.docx}"
+    "api/index.mjs": {
+      "maxDuration": 300
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/index"
+      "destination": "/api/index?path=:path*"
     },
     {
       "source": "/:path*",

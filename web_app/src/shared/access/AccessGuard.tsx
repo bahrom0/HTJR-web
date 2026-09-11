@@ -8,16 +8,8 @@ export function AccessGuard() {
   if (access.state === 'checking')
     return (
       <LoadingState
-        title="Проверяем сессию"
-        description="Подключаем защищённое рабочее пространство."
-      />
-    );
-  if (access.state === 'anonymous')
-    return (
-      <Navigate
-        to="/access"
-        replace
-        state={{ returnTo: `${location.pathname}${location.search}` }}
+        title="Подключаем сессию"
+        description="Подготавливаем рабочее пространство."
       />
     );
   return <Outlet />;

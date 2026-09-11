@@ -144,7 +144,7 @@ export default function SettingsRoute() {
 
   async function logout() {
     await access.logout();
-    navigate('/access', { replace: true });
+    navigate('/app', { replace: true });
   }
 
   return (
