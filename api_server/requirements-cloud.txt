@@ -1,0 +1,13 @@
+# Cloud-only dependencies for Render / Vercel deployment
+# Gemini-only mode: no TrOCR, no CRAFT, no LoRA, no CUDA
+# Total size: ~150-200 MB (vs ~4 GB with torch)
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.13.4
+numpy==2.2.3
+pillow==11.1.0
+# opencv is kept: used in region geometry (services/regions.py) for convex hull / contour ops
+opencv-python-headless==5.0.0.93
+argon2-cffi==25.1.0
+python-multipart

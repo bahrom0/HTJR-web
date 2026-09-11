@@ -13,30 +13,12 @@ dependencies = [
   "pydantic==2.13.4",
   "numpy==2.2.3",
   "pillow==11.1.0",
-  "opencv-python-headless==5.0.0.93",
-  "torch==2.11.0+cu128",
-  "torchvision==0.26.0+cu128",
-  "transformers==4.57.6",
-  "peft==0.18.0",
-  "safetensors==0.5.3",
-  "protobuf==6.33.5",
+  "python-multipart>=0.0.9",
+  "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
-dev = ["httpx==0.28.1", "pytest==9.1.1"]
-
-# CUDA-enabled PyTorch. It still runs on CPU when config.toml sets CUDA=false.
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu128" }
-torchvision = { index = "pytorch-cu128" }
-
-[tool.uv]
-environments = ["sys_platform == 'win32'"]
+dev = ["pytest==9.1.1"]
 
 [project.scripts]
 tajik-htr-api = "app.cli:run_api"

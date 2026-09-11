@@ -28,6 +28,18 @@ function createRequestId(): string {
   return crypto.randomUUID();
 }
 
+export function getAnonymousSessionToken(): string {
+  if (typeof window === 'undefined') return 'anon-default';
+  let token = localStorage.getItem('htr_anonymous_token');
+  if (!token) {
+    token = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'anon-' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    localStorage.setItem('htr_anonymous_token', token);
+  }
+  return token;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -138,6 +150,7 @@ export async function request<T>(
       credentials: 'include',
       headers: {
         'X-Request-ID': requestId,
+        'X-Session-ID': getAnonymousSessionToken(),
         ...(options.json === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(options.csrfToken ? { 'X-CSRF-Token': options.csrfToken } : {}),
         ...options.headers,

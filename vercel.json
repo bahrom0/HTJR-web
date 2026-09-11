@@ -1,29 +1,22 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "new_front/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api_server/app/main.py",
-      "use": "@vercel/python"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "cd new_front && bun install --frozen-lockfile",
+  "buildCommand": "cd new_front && bun run build",
+  "outputDirectory": "new_front/dist",
+  "functions": {
+    "api/index.mjs": {
+      "maxDuration": 300
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "api_server/app/main.py"
+      "source": "/api/:path*",
+      "destination": "/api/index?path=:path*"
     },
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "new_front/index.html"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }

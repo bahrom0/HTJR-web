@@ -26,14 +26,17 @@ export function NewDocument() {
     setUploading(true);
     let docId = Math.random().toString(36).substring(7);
     let previewUrl: string | undefined = undefined;
+    let storageKey: string | undefined = undefined;
 
     try {
       const uploadRes = await api.uploadFile(file);
       docId = uploadRes.document_id;
       previewUrl = uploadRes.asset?.preview_url;
+      storageKey = uploadRes.storage_key;
     } catch (e) {
-      console.warn('Backend upload skipped/failed, proceeding with local object url', e);
-      previewUrl = URL.createObjectURL(file);
+      console.error('Upload failed', e);
+      alert(e instanceof Error ? e.message : 'Не удалось загрузить изображение.');
+      return;
     } finally {
       setUploading(false);
     }
@@ -45,6 +48,7 @@ export function NewDocument() {
       updatedAt: new Date().toISOString(),
       pageCount: 1,
       thumbnail: previewUrl,
+      storageKey,
       step: 'prepare',
     });
     navigate(`/documents/${docId}/pages/1/prepare`);

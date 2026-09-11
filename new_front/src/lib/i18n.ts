@@ -317,6 +317,7 @@ export function useTranslation() {
   const language = useAppStore((state) => state.language);
   return {
     t: (key: keyof typeof dict.en) => dict[language][key] || key,
-    lang: language
+    lang: language,
+    language
   };
 }

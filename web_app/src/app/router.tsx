@@ -36,8 +36,8 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { path: '/', element: lazyRoute(<LandingRoute />) },
-      { path: '/access', element: lazyRoute(<AccessRoute />) },
-      { path: '/access/register', element: lazyRoute(<AccessRoute />) },
+      { path: '/access', element: <Navigate to="/app" replace /> },
+      { path: '/access/register', element: <Navigate to="/app" replace /> },
       { path: '/offline', element: lazyRoute(<OfflineRoute />) },
       { path: '/0', element: lazyRoute(<DemoRoute />) },
       {

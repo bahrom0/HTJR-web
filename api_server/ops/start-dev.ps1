@@ -149,15 +149,18 @@ function Remove-LauncherState {
 }
 
 function Test-KrakenSelected {
+    if ($env:HTR_OCR_PROVIDER -eq 'gemini' -and ($env:HTR_GEMINI_MODE -eq 'page' -or [String]::IsNullOrWhiteSpace($env:HTR_GEMINI_MODE))) {
+        return $false
+    }
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
         return $false
     }
-    $geminiSelected = $null -ne (
+    $geminiSelected = ($env:HTR_OCR_PROVIDER -eq 'gemini') -or ($null -ne (
         Select-String -LiteralPath $configPath -Pattern '^\s*ocr_provider\s*=\s*"gemini"\s*(?:#.*)?$'
-    )
-    $geminiPageMode = $null -ne (
+    ))
+    $geminiPageMode = ($env:HTR_GEMINI_MODE -eq 'page') -or ($null -ne (
         Select-String -LiteralPath $configPath -Pattern '^\s*gemini_mode\s*=\s*"page"\s*(?:#.*)?$'
-    )
+    ))
     if ($geminiSelected -and $geminiPageMode) {
         return $false
     }
@@ -167,6 +170,9 @@ function Test-KrakenSelected {
 }
 
 function Test-GeminiSelected {
+    if ($env:HTR_OCR_PROVIDER -eq 'gemini') {
+        return $true
+    }
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
         return $false
     }
@@ -176,6 +182,9 @@ function Test-GeminiSelected {
 }
 
 function Test-CudaSelected {
+    if ($env:HTR_ML_DEVICE -eq 'cpu' -or $env:HTR_CUDA -eq 'false') {
+        return $false
+    }
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
         return $false
     }
