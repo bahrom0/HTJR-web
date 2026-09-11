@@ -495,6 +495,158 @@
         "title": "Crop",
         "type": "object"
       },
+      "DemoDetectionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detector_version": {
+            "title": "Detector Version",
+            "type": "string"
+          },
+          "regions": {
+            "items": {
+              "$ref": "#/components/schemas/DemoRegion"
+            },
+            "title": "Regions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detector_version",
+          "regions"
+        ],
+        "title": "DemoDetectionResponse",
+        "type": "object"
+      },
+      "DemoPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "x": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "DemoPoint",
+        "type": "object"
+      },
+      "DemoPresetInput": {
+        "additionalProperties": false,
+        "properties": {
+          "original_filename": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "regions": {
+            "items": {
+              "$ref": "#/components/schemas/DemoRegion"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Regions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "regions"
+        ],
+        "title": "DemoPresetInput",
+        "type": "object"
+      },
+      "DemoPresetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "image_sha256": {
+            "title": "Image Sha256",
+            "type": "string"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "regions": {
+            "items": {
+              "$ref": "#/components/schemas/DemoRegion"
+            },
+            "title": "Regions",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_sha256",
+          "text",
+          "original_filename",
+          "regions"
+        ],
+        "title": "DemoPresetResponse",
+        "type": "object"
+      },
+      "DemoRegion": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "polygon": {
+            "items": {
+              "$ref": "#/components/schemas/DemoPoint"
+            },
+            "title": "Polygon",
+            "type": "array"
+          },
+          "reading_order": {
+            "minimum": 0.0,
+            "title": "Reading Order",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 10000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "polygon",
+          "reading_order",
+          "text"
+        ],
+        "title": "DemoRegion",
+        "type": "object"
+      },
       "Diagnostics": {
         "additionalProperties": false,
         "properties": {
@@ -1806,6 +1958,7 @@
             "enum": [
               "craft",
               "kraken",
+              "gemini_openrouter",
               "manual",
               "adjusted"
             ],
@@ -1937,6 +2090,7 @@
             "enum": [
               "craft",
               "kraken",
+              "gemini_openrouter",
               "manual",
               "adjusted"
             ],
@@ -2509,6 +2663,132 @@
         "summary": "Preview Asset",
         "tags": [
           "documents"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/demo/detect-regions": {
+      "post": {
+        "operationId": "livePostApiV1DemoDetectRegionsV1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoDetectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Detect Demo Regions",
+        "tags": [
+          "demo"
+        ],
+        "x-implementation-status": "live"
+      }
+    },
+    "/api/v1/demo/presets/{image_sha256}": {
+      "get": {
+        "operationId": "liveGetApiV1DemoPresetsImageSha256V1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_sha256",
+            "required": true,
+            "schema": {
+              "title": "Image Sha256",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoPresetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Get Demo Preset",
+        "tags": [
+          "demo"
+        ],
+        "x-implementation-status": "live"
+      },
+      "put": {
+        "operationId": "livePutApiV1DemoPresetsImageSha256V1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_sha256",
+            "required": true,
+            "schema": {
+              "title": "Image Sha256",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoPresetInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoPresetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ],
+        "summary": "Save Demo Preset",
+        "tags": [
+          "demo"
         ],
         "x-implementation-status": "live"
       }

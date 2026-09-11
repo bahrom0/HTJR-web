@@ -85,3 +85,37 @@ do not spread unrelated literal values through routes.
    breakpoint, or animation rule.
 4. Verify light theme, dark theme, desktop, mobile, keyboard focus, and
    reduced-motion behavior before completion.
+
+## Recognition workspace and automatic handoff
+
+- Routes: `/processing`, `/preparation`, and `/regions`.
+- Product flow after upload is one continuous operation: the server evaluates
+  image quality, confirms the default preparation recipe, and starts the
+  durable Kraken line detector. The interface must not make those server stages
+  look like three user decisions.
+- `/processing` uses one calm, centered loader. Its three compact labels explain
+  progress but are not controls. At `awaiting_region_review`, it fades into the
+  real `/regions` editor; only the later confirmed OCR stage may open `/result`.
+- `/preparation` remains an advanced manual correction route for retry/error
+  recovery. It is not part of the normal happy path.
+
+### Recognized-lines editor
+
+- Desktop: fixed-height workspace beneath the shared header, centered image
+  canvas on the left and one `330-370px` glass panel on the right. The right
+  side is one component, not a stack of unrelated floating cards.
+- The four tool sections are `Распознавание текста`, `Область`, `Вид`, and
+  `История`. Recognition shows Kraken regions, reading order, source, warnings,
+  and normalized X/Y position. Selection contains exact bounds, split, merge,
+  delete, and ordering actions. View owns zoom/fit/draw. History owns undo/redo,
+  server refresh, dirty state, and conflict messages.
+- Mobile at `900px` and below: canvas keeps the full available editor area and
+  tools become a three-position bottom sheet. The visible sheet height is
+  subtracted from canvas fitting so the document never sits underneath the
+  controls. Tap the handle to collapse/restore; swipe it to move between
+  collapsed, half, and full positions.
+- Wheel input inside the desktop canvas and pinch input on touch devices change
+  only the image view. The page itself must not scroll while the pointer is over
+  the canvas. Region drag, 44px resize handles, keyboard movement, local draft,
+  undo/redo, revision conflict recovery, and server-owned confirmation remain
+  functional at every breakpoint.

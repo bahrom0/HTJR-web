@@ -1,6 +1,6 @@
 export type NormalizedPoint = Readonly<{ x: number; y: number }>;
 
-export type RegionSource = 'craft' | 'kraken' | 'manual' | 'adjusted';
+export type RegionSource = 'craft' | 'kraken' | 'gemini_openrouter' | 'manual' | 'adjusted';
 export type ResizeCorner = 'northwest' | 'northeast' | 'southeast' | 'southwest';
 export type SplitDirection = 'horizontal' | 'vertical';
 

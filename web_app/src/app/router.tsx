@@ -7,6 +7,7 @@ import { AccessGuard } from '@shared/access/AccessGuard';
 import { LoadingState } from '@shared/ui';
 
 const AccessRoute = lazy(() => import('@routes/access/AccessRoute'));
+const LandingRoute = lazy(() => import('@routes/landing/LandingRoute'));
 const HomeRoute = lazy(() => import('@routes/home/HomeRoute'));
 const OfflineRoute = lazy(() => import('@routes/offline/OfflineRoute'));
 const NotFoundRoute = lazy(() => import('@routes/not-found/NotFoundRoute'));
@@ -19,6 +20,7 @@ const SettingsRoute = lazy(() => import('@routes/settings/SettingsRoute'));
 const DocumentsRoute = lazy(() => import('@routes/documents/DocumentsRoute'));
 const EditorRoute = lazy(() => import('@routes/editor/EditorRoute'));
 const ExportRoute = lazy(() => import('@routes/export/ExportRoute'));
+const DemoRoute = lazy(() => import('@routes/demo/DemoRoute'));
 
 function RouteFallback() {
   return <LoadingState title="Открываем раздел" description="Загружаем интерфейс." />;
@@ -33,13 +35,15 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     errorElement: <RouteError />,
     children: [
+      { path: '/', element: lazyRoute(<LandingRoute />) },
       { path: '/access', element: lazyRoute(<AccessRoute />) },
       { path: '/access/register', element: lazyRoute(<AccessRoute />) },
       { path: '/offline', element: lazyRoute(<OfflineRoute />) },
+      { path: '/0', element: lazyRoute(<DemoRoute />) },
       {
         element: <AccessGuard />,
         children: [
-          { path: '/', element: lazyRoute(<HomeRoute />) },
+          { path: '/app', element: lazyRoute(<HomeRoute />) },
           { path: '/capture', element: lazyRoute(<CaptureRoute />) },
           { path: '/preparation', element: lazyRoute(<PreparationRoute />) },
           { path: '/regions', element: lazyRoute(<RegionReviewRoute />) },

@@ -1,10 +1,12 @@
 const DATABASE_NAME = 'tajik-htr-studio';
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 
 export const databaseStores = {
   uploadOutbox: 'upload-outbox',
   preparationDrafts: 'preparation-drafts',
   regionDrafts: 'region-drafts',
+  documentCache: 'document-cache',
+  editorDrafts: 'editor-drafts',
 } as const;
 
 export type DatabaseStore = (typeof databaseStores)[keyof typeof databaseStores];
@@ -22,6 +24,12 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!database.objectStoreNames.contains(databaseStores.regionDrafts)) {
         database.createObjectStore(databaseStores.regionDrafts, { keyPath: 'pageId' });
+      }
+      if (!database.objectStoreNames.contains(databaseStores.documentCache)) {
+        database.createObjectStore(databaseStores.documentCache, { keyPath: 'cacheKey' });
+      }
+      if (!database.objectStoreNames.contains(databaseStores.editorDrafts)) {
+        database.createObjectStore(databaseStores.editorDrafts, { keyPath: 'documentId' });
       }
     };
     request.onsuccess = () => resolve(request.result);

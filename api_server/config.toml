@@ -6,13 +6,26 @@
 # true: use the preserved legacy CRAFT detector and its grouping pipeline.
 CRAFT = false
 
-# true: use NVIDIA CUDA when PyTorch detects a compatible GPU.
-# false: run all recognition strictly on the CPU.
-CUDA = true
+# Gemini/OpenRouter is the only active OCR path on this branch. Keep local
+# heavyweight model startup disabled.
+CUDA = false
 
 kraken_endpoint = "http://127.0.0.1:8011"
 kraken_timeout_seconds = 180
 
 # RTX 4050 Laptop (6 GB): four line crops fit alongside the FP16 TrOCR model.
 # Lower this only if the worker reports CUDA out-of-memory errors.
-trocr_batch_size = 4
+trocr_batch_size = 1
+
+# Restore the preserved rsLoRA adapter for the production worker.
+# Set to "none" only for an explicit base-only diagnostic run.
+trocr_adapter_mode = "none"
+
+# Temporary cloud OCR provider. The API key is read only from OPENROUTER_API_KEY.
+ocr_provider = "gemini"
+gemini_mode = "page"
+gemini_model = "google/gemini-3.8-flash:floor"
+gemini_timeout_seconds = 120
+gemini_thinking_level = "low"
+gemini_max_output_tokens = 4096
+gemini_max_page_regions = 200

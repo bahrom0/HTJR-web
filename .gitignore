@@ -39,6 +39,14 @@ web_app/.playwright-cli/
 web_app/output/
 output/playwright/
 
+# Generated review, QA, and presentation artifacts
+output/
+.tmp/
+.docx_htr_guide_qa/
+annotation_app/data/
+soft-navigator-title-example.pptx
+*.pptx.inspect.ndjson
+
 # Python build/runtime
 .venv/
 .venv-*/
@@ -62,3 +70,4 @@ api_server/models/craft/*
 
 # Local source images and training material
 raw_dataset/
+final_product/

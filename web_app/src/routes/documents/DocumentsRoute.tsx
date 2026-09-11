@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { deleteDocument, getDocuments, type DocumentItem } from '@entities/document';
+import { deleteDocument, getDocuments, loadDocumentCache, saveDocumentCache, type DocumentItem } from '@entities/document';
 import { useAccess } from '@shared/access/AccessProvider';
 import { Button, Dialog, Icon, LoadingState, Status } from '@shared/ui';
 
@@ -27,7 +27,15 @@ export default function DocumentsRoute() {
         if (controller.signal.aborted) return;
         if (result.ok) {
           setDocuments(result.value);
+          void saveDocumentCache(result.value);
           setState('ready');
+        } else if (!query) {
+          void loadDocumentCache().then((cached) => {
+            if (cached.length) {
+              setDocuments(cached);
+              setState('ready');
+            } else setState('error');
+          });
         } else setState('error');
       });
     }, query ? 250 : 0);

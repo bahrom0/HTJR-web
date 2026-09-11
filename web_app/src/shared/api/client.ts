@@ -149,13 +149,25 @@ export async function request<T>(
     if (!response.ok) return { ok: false, error: normalizeError(body, requestId) };
     const parsed = parse(body);
     if (parsed === null) {
+      const serverRequestId = response.headers.get('X-Request-ID') ?? requestId;
+      console.error('api_invalid_response', {
+        path,
+        method: options.method ?? 'GET',
+        status: response.status,
+        requestId: serverRequestId,
+        bodyType: Array.isArray(body) ? 'array' : typeof body,
+        bodyKeys:
+          typeof body === 'object' && body !== null && !Array.isArray(body)
+            ? Object.keys(body).sort()
+            : [],
+      });
       return {
         ok: false,
         error: {
           code: 'invalid_response',
-          message: 'The server response was invalid.',
+          message: `Некорректный ответ сервера: ${path}. Request ID: ${serverRequestId}.`,
           retryable: false,
-          requestId,
+          requestId: serverRequestId,
         },
       };
     }

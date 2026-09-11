@@ -9,7 +9,7 @@ describe('capture preflight', () => {
     const oversized = new File([new Uint8Array(CLIENT_UPLOAD_MAX_BYTES + 1)], 'large.png', {
       type: 'image/png',
     });
-    expect(await preflightImage(oversized)).toContain('25 МБ');
+    expect(await preflightImage(oversized)).toContain('10 МБ');
   });
 
   it('checks decoded pixel dimensions and closes the bitmap', async () => {

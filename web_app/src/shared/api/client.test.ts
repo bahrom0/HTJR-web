@@ -99,4 +99,29 @@ describe('request transport', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_request' } });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('logs safe response shape and request ID when contract parsing fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ page_id: 'bad-region-id', regions: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'server-shape-id' },
+      }),
+    );
+
+    const result = await request('/pages/page-id/regions', () => null);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_response', requestId: 'server-shape-id' },
+    });
+    expect(consoleError).toHaveBeenCalledWith('api_invalid_response', {
+      path: '/pages/page-id/regions',
+      method: 'GET',
+      status: 200,
+      requestId: 'server-shape-id',
+      bodyType: 'object',
+      bodyKeys: ['page_id', 'regions'],
+    });
+  });
 });

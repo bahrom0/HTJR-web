@@ -45,7 +45,11 @@ def main() -> int:
         representative = source.convert("RGB")
     long_line = representative.resize((max(1024, representative.width * 4), max(64, representative.height)), Image.Resampling.LANCZOS)
     empty = Image.new("RGB", (max(384, representative.width), max(64, representative.height)), "white")
-    runtime = TrocrRuntime(Path(__file__).resolve().parents[1] / "models", device=arguments.device)
+    runtime = TrocrRuntime(
+        Path(__file__).resolve().parents[1] / "models",
+        device=arguments.device,
+        adapter_mode="rslora",
+    )
     try:
         evidence = runtime.warmup()
         observations = {

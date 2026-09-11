@@ -8,7 +8,16 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.core.settings import settings
-from app.services.regions import BoundingBox, DetectorComponent, GroupingParameters, group_components, grouping_metrics, reading_order
+from app.services.regions import (
+    BoundingBox,
+    DetectorComponent,
+    GroupingParameters,
+    group_components,
+    grouping_metrics,
+    LineReconstructionParameters,
+    reading_order,
+    reconstruct_line_regions,
+)
 
 
 def _image_bytes() -> bytes:
@@ -63,6 +72,152 @@ def _manual_region(order: int = 0) -> dict[str, object]:
         "source": "manual",
         "flags": [],
     }
+
+
+def _detected_region(region_id: str, left: float, top: float, right: float, bottom: float) -> dict[str, object]:
+    return {
+        "id": region_id,
+        "polygon": [
+            {"x": left, "y": top},
+            {"x": right, "y": top},
+            {"x": right, "y": bottom},
+            {"x": left, "y": bottom},
+        ],
+        "source": "craft",
+        "flags": [],
+        "detector_version": "test-detector",
+        "detector_score": 0.9,
+    }
+
+
+def test_line_reconstruction_merges_fragments_of_one_physical_line() -> None:
+    regions, audit = reconstruct_line_regions(
+        [
+            _detected_region("left", 0.02, 0.10, 0.24, 0.15),
+            _detected_region("middle", 0.25, 0.102, 0.48, 0.153),
+            _detected_region("right", 0.49, 0.098, 0.78, 0.15),
+        ]
+    )
+
+    assert len(regions) == 1
+    assert regions[0]["source_region_ids"] == ["left", "middle", "right"]
+    assert "line_reconstructed" in regions[0]["flags"]
+    assert audit["merged_line_count"] == 1
+    assert audit["merges"][0]["reason"] == "same_column_geometry"
+
+
+def test_line_reconstruction_preserves_oriented_quad_geometry() -> None:
+    regions, _ = reconstruct_line_regions(
+        [
+            {
+                **_detected_region("sloped", 0.10, 0.20, 0.55, 0.28),
+                "polygon": [
+                    {"x": 0.10, "y": 0.20},
+                    {"x": 0.55, "y": 0.26},
+                    {"x": 0.54, "y": 0.31},
+                    {"x": 0.09, "y": 0.25},
+                ],
+            }
+        ],
+        LineReconstructionParameters(page_aspect_ratio=2.0),
+    )
+
+    assert len(regions) == 1
+    assert len(regions[0]["polygon"]) == 4
+    assert "oriented_quad" in regions[0]["flags"]
+    polygon = regions[0]["polygon"]
+    assert any(
+        abs(left["x"] - right["x"]) > 1e-6 and abs(left["y"] - right["y"]) > 1e-6
+        for left, right in zip(polygon, (*polygon[1:], polygon[0]), strict=True)
+    )
+
+
+def test_line_reconstruction_keeps_detector_reading_order_when_available() -> None:
+    first = _detected_region("detector-first", 0.05, 0.35, 0.85, 0.40)
+    second = _detected_region("detector-second", 0.05, 0.10, 0.85, 0.15)
+    first["reading_order"] = 0
+    second["reading_order"] = 1
+
+    regions, _ = reconstruct_line_regions([first, second])
+
+    assert [region["source_region_ids"] for region in regions] == [["detector-first"], ["detector-second"]]
+    assert [region["reading_order"] for region in regions] == [0, 1]
+
+
+def test_line_reconstruction_keeps_two_neighbouring_lines_separate() -> None:
+    regions, _ = reconstruct_line_regions(
+        [
+            _detected_region("top-a", 0.04, 0.10, 0.30, 0.14),
+            _detected_region("top-b", 0.31, 0.101, 0.60, 0.141),
+            _detected_region("bottom-a", 0.04, 0.20, 0.30, 0.24),
+            _detected_region("bottom-b", 0.31, 0.201, 0.60, 0.241),
+        ]
+    )
+
+    assert len(regions) == 2
+    assert [region["reading_order"] for region in regions] == [0, 1]
+    assert [region["source_region_ids"] for region in regions] == [["top-a", "top-b"], ["bottom-a", "bottom-b"]]
+
+
+def test_line_reconstruction_respects_two_columns_reading_order() -> None:
+    regions, _ = reconstruct_line_regions(
+        [
+            _detected_region("left-top", 0.04, 0.08, 0.30, 0.13),
+            _detected_region("left-bottom", 0.04, 0.26, 0.30, 0.31),
+            _detected_region("right-top", 0.64, 0.08, 0.90, 0.13),
+            _detected_region("right-bottom", 0.64, 0.26, 0.90, 0.31),
+        ]
+    )
+
+    assert [region["source_region_ids"] for region in regions] == [
+        ["left-top"],
+        ["left-bottom"],
+        ["right-top"],
+        ["right-bottom"],
+    ]
+    assert [region["reading_order"] for region in regions] == [0, 1, 2, 3]
+
+
+def test_line_reconstruction_rejects_large_horizontal_gap() -> None:
+    regions, audit = reconstruct_line_regions(
+        [
+            _detected_region("first", 0.03, 0.10, 0.20, 0.15),
+            _detected_region("far-away", 0.72, 0.10, 0.92, 0.15),
+        ],
+        LineReconstructionParameters(max_horizontal_gap_multiplier=3.0),
+    )
+
+    assert len(regions) == 2
+    assert audit["merges"] == []
+
+
+def test_line_reconstruction_rejects_erroneous_height_or_baseline_merge() -> None:
+    regions, audit = reconstruct_line_regions(
+        [
+            _detected_region("normal", 0.05, 0.10, 0.45, 0.15),
+            _detected_region("tall-neighbour", 0.46, 0.102, 0.80, 0.30),
+        ]
+    )
+
+    assert len(regions) == 2
+    assert audit["merges"] == []
+
+
+def test_line_reconstruction_rejects_incompatible_baseline_slope() -> None:
+    sloped = _detected_region("sloped", 0.46, 0.10, 0.56, 0.20)
+    sloped["baseline"] = [{"x": 0.46, "y": 0.15}, {"x": 0.56, "y": 0.20}]
+    sloped["polygon"] = [
+        {"x": 0.46, "y": 0.10},
+        {"x": 0.56, "y": 0.15},
+        {"x": 0.56, "y": 0.20},
+        {"x": 0.46, "y": 0.15},
+    ]
+    regions, audit = reconstruct_line_regions(
+        [_detected_region("normal", 0.05, 0.10, 0.40, 0.15), sloped]
+    )
+
+    assert len(regions) == 2
+    assert audit["merges"] == []
 
 
 def test_grouping_is_deterministic_and_does_not_guess_columns() -> None:

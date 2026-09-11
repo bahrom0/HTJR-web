@@ -1,0 +1,74 @@
+Тоҷикӣ
+Tajik HTR Studio  --  низоми вебии шинохти матни дастнавис мебошад. Барнома тасвирҳои воқеии ҳуҷҷатҳоро қабул карда, онҳоро дар сервер коркард мекунад ва матни шинохташударо барои санҷиш, таҳрир ва содирот пешниҳод менамояд.
+Назначение
+Мақсад
+Purpose
+Шинохти матни дастнавис аз тасвири воқеии ҳуҷҷат ва табдил додани он ба матни таҳриршаванда.
+
+Марҳилаҳои асосии кор
+1. Корбар ҳуҷҷат ё тасвири воқеиро бор мекунад.
+2. Низом тасвирро пешакӣ коркард намуда, минтақаҳои матн ва сатрҳоро муайян мекунад.
+3. Минтақаҳои матн бо модели CRAFT муайян карда мешаванд.
+4. Матн бо модели TrOCR ва мутобиқсозии RSLoRA барои забони тоҷикӣ шинохта мешавад.
+5. Натиҷа дар муҳаррир нишон дода мешавад; корбар метавонад онро санҷида ва ислоҳ кунад.
+6. Матни ниҳоӣ барои содирот омода мешавад.
+Имкониятҳои асосӣ
+Боркунии ҳуҷҷатҳои воқеӣ ва коркарди серверӣ.
+Муайян кардани минтақаҳо ва сатрҳои матн.
+Шинохти матни дастнавис бо CRAFT ва TrOCR.
+Нигоҳ доштани натиҷаи коркард ва таҳрири матн.
+Содироти натиҷаи санҷидашуда.
+Барои кӣ
+Барнома барои муҳаққиқон, бойгончиён, кормандони муассисаҳо ва дигар истифодабарандагоне пешбинӣ шудааст, ки бо ҳуҷҷатҳои дастнависи тоҷикӣ кор мекунанд.
+Натиҷаи лоиҳа
+Истифодабаранда аз тасвири ҳуҷҷати воқеӣ матни таҳриршаванда мегирад ва метавонад онро баъд аз санҷиш нигоҳ дорад ё содир намояд.
+
+Русский
+Tajik HTR Studio  --  веб-система для распознавания рукописного текста. Программа принимает реальные изображения документов, выполняет серверную обработку и предоставляет распознанный текст для проверки, редактирования и экспорта.
+Назначение
+Назначение
+Purpose
+Распознавание рукописного текста с реального изображения документа и преобразование его в редактируемый текст.
+
+Основной рабочий процесс
+1. Пользователь загружает реальный документ или изображение.
+2. Система выполняет предварительную обработку изображения и определяет текстовые области и строки.
+3. Текстовые области определяются с помощью CRAFT.
+4. Текст распознаётся моделью TrOCR с адаптацией RSLoRA для таджикского языка.
+5. Результат отображается в редакторе, где его можно проверить и исправить.
+6. Проверенный текст подготавливается к экспорту.
+Основные возможности
+Загрузка реальных документов и серверная обработка.
+Определение текстовых областей и строк.
+Распознавание рукописного текста с использованием CRAFT и TrOCR.
+Сохранение и редактирование результата распознавания.
+Экспорт проверенного результата.
+Для кого предназначен проект
+Система предназначена для исследователей, архивистов, сотрудников учреждений и других пользователей, работающих с таджикскими рукописными документами.
+Результат проекта
+Пользователь получает редактируемый текст из реального изображения документа и может проверить, исправить, сохранить или экспортировать результат.
+
+English
+Tajik HTR Studio is a web-based handwritten text recognition system. It accepts real document images, performs server-side processing, and provides recognized text for review, editing, and export.
+Назначение
+Purpose
+Purpose
+To recognize handwritten text from a real document image and convert it into editable text.
+
+Main workflow
+1. The user uploads a real document or image.
+2. The system preprocesses the image and identifies text areas and lines.
+3. Text regions are detected with CRAFT.
+4. Text is recognized with TrOCR and a Tajik-language RSLoRA adaptation.
+5. The result is displayed in an editor for review and correction.
+6. The reviewed text is prepared for export.
+Core capabilities
+Uploading real documents and processing them on the server.
+Detecting text areas and lines.
+Recognizing handwritten text with CRAFT and TrOCR.
+Saving and editing recognition results.
+Exporting the reviewed result.
+Intended users
+The system is intended for researchers, archivists, institutional staff, and other users working with Tajik handwritten documents.
+Project outcome
+The user receives editable text from a real document image and can review, correct, save, or export the result.

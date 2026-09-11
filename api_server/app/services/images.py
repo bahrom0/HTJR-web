@@ -45,18 +45,6 @@ def _magic_format(path: Path) -> str | None:
     return None
 
 
-def _container_has_no_payload(path: Path, image_format: str) -> bool:
-    data = path.read_bytes()
-    if image_format == "PNG":
-        marker = b"\x00\x00\x00\x00IEND\xaeB`\x82"
-        return data.endswith(marker)
-    if image_format == "JPEG":
-        return data.rstrip(b"\x00\t\r\n ").endswith(b"\xff\xd9")
-    if image_format == "WEBP" and len(data) >= 12:
-        return int.from_bytes(data[4:8], "little") + 8 == len(data)
-    return False
-
-
 def validate_image(
     path: Path,
     declared_media_type: str,
@@ -70,9 +58,6 @@ def validate_image(
     expected_type = SUPPORTED_FORMATS[magic]
     if declared_media_type.lower().split(";", 1)[0].strip() != expected_type:
         raise ApiError(415, "image_type_mismatch", "The declared image type does not match its contents.")
-    if not _container_has_no_payload(path, magic):
-        raise ApiError(422, "image_container_invalid", "The image container is malformed or contains trailing payload.")
-
     old_limit = Image.MAX_IMAGE_PIXELS
     Image.MAX_IMAGE_PIXELS = max_pixels
     try:

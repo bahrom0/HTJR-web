@@ -44,12 +44,43 @@ $apiErrorLogPath = Join-Path $stateDirectory 'api.stderr.log'
 $workerOutputLogPath = Join-Path $stateDirectory 'worker.stdout.log'
 $workerErrorLogPath = Join-Path $stateDirectory 'worker.stderr.log'
 $configPath = Join-Path $projectRoot 'config.toml'
+$envPath = Join-Path $projectRoot '.env'
 $workspaceRoot = Split-Path -Parent $projectRoot
 $krakenLauncher = Join-Path $workspaceRoot 'kraken_sidecar\run-wsl.ps1'
 $krakenOutputLogPath = Join-Path $stateDirectory 'kraken.stdout.log'
 $krakenErrorLogPath = Join-Path $stateDirectory 'kraken.stderr.log'
 $krakenPort = 8011
 $webDist = $null
+
+function Import-ProjectEnvironment {
+    if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) {
+        return
+    }
+    foreach ($line in Get-Content -LiteralPath $envPath -Encoding UTF8) {
+        $trimmed = $line.Trim()
+        if ([String]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) {
+            continue
+        }
+        $parts = $trimmed.Split('=', 2)
+        if ($parts.Count -ne 2) {
+            throw "Invalid .env entry: $trimmed"
+        }
+        $name = $parts[0].Trim()
+        if ($name -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+            throw "Invalid .env variable name: $name"
+        }
+        if ($null -ne [Environment]::GetEnvironmentVariable($name, 'Process')) {
+            continue
+        }
+        $value = $parts[1].Trim()
+        if ($value.Length -ge 2 -and (($value[0] -eq '"' -and $value[-1] -eq '"') -or ($value[0] -eq "'" -and $value[-1] -eq "'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        [Environment]::SetEnvironmentVariable($name, $value, 'Process')
+    }
+}
+
+Import-ProjectEnvironment
 if (-not [String]::IsNullOrWhiteSpace($WebDistPath)) {
     $webDist = (Resolve-Path -LiteralPath $WebDistPath -ErrorAction Stop).Path
     if (-not (Test-Path -LiteralPath (Join-Path $webDist 'index.html') -PathType Leaf)) {
@@ -121,8 +152,26 @@ function Test-KrakenSelected {
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
         return $false
     }
+    $geminiSelected = $null -ne (
+        Select-String -LiteralPath $configPath -Pattern '^\s*ocr_provider\s*=\s*"gemini"\s*(?:#.*)?$'
+    )
+    $geminiPageMode = $null -ne (
+        Select-String -LiteralPath $configPath -Pattern '^\s*gemini_mode\s*=\s*"page"\s*(?:#.*)?$'
+    )
+    if ($geminiSelected -and $geminiPageMode) {
+        return $false
+    }
     return $null -ne (
         Select-String -LiteralPath $configPath -Pattern '^\s*CRAFT\s*=\s*false\s*(?:#.*)?$' -CaseSensitive
+    )
+}
+
+function Test-GeminiSelected {
+    if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+        return $false
+    }
+    return $null -ne (
+        Select-String -LiteralPath $configPath -Pattern '^\s*ocr_provider\s*=\s*"gemini"\s*(?:#.*)?$'
     )
 }
 
@@ -413,7 +462,7 @@ try {
 
     Write-Output '[2/4] Worker: starting persistent ML worker...'
     $workerProcess = Start-Process -FilePath $python -ArgumentList @('-m', 'app.worker.main') -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $workerOutputLogPath -RedirectStandardError $workerErrorLogPath -PassThru
-    $cuda = Get-CudaSummary -Interpreter $python
+    $cuda = if (Test-GeminiSelected) { $null } else { Get-CudaSummary -Interpreter $python }
     [pscustomobject]@{
         schema_version = 2
         python = $python
@@ -427,8 +476,10 @@ try {
         started_at = (Get-Date).ToUniversalTime().ToString('o')
     } | ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding UTF8
 
-    $detectorLabel = $(if ($krakenSelected) { 'Kraken' } else { 'CRAFT' })
-    Write-Output "[3/4] ML models: loading $detectorLabel + TrOCR and keeping them in memory..."
+    $geminiSelected = Test-GeminiSelected
+    $detectorLabel = $(if ($krakenSelected) { 'Kraken' } elseif ($geminiSelected) { 'cloud page detector' } else { 'CRAFT' })
+    $recognizerLabel = $(if ($geminiSelected) { 'cloud OCR' } else { 'TrOCR' })
+    Write-Output "[3/4] OCR pipeline: loading $detectorLabel + $recognizerLabel..."
     if ($cuda) { Write-Output "[i] CUDA: $cuda" }
     $workerStartupDeadline = (Get-Date).AddSeconds($ModelWarmupTimeoutSeconds)
     do {
@@ -441,15 +492,15 @@ try {
             break
         }
         $elapsed = [int]((Get-Date) - ($workerStartupDeadline.AddSeconds(-$ModelWarmupTimeoutSeconds))).TotalSeconds
-        Write-Progress -Activity 'Tajik HTR Studio: warming ML models' -Status "$detectorLabel + TrOCR loading ($elapsed s / $ModelWarmupTimeoutSeconds s)" -PercentComplete ([Math]::Min(99, [int](100 * $elapsed / $ModelWarmupTimeoutSeconds)))
+        Write-Progress -Activity 'Tajik HTR Studio: warming OCR pipeline' -Status "$detectorLabel + $recognizerLabel loading ($elapsed s / $ModelWarmupTimeoutSeconds s)" -PercentComplete ([Math]::Min(99, [int](100 * $elapsed / $ModelWarmupTimeoutSeconds)))
         Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $workerStartupDeadline)
 
     if (-not (Test-WorkerReadiness -Interpreter $python)) {
         throw "The ML worker did not finish warmup within $ModelWarmupTimeoutSeconds seconds. Check $workerErrorLogPath"
     }
-    Write-Progress -Activity 'Tajik HTR Studio: warming ML models' -Completed
-    Write-Output '[OK] ML models: ready and retained in worker memory.'
+    Write-Progress -Activity 'Tajik HTR Studio: warming OCR pipeline' -Completed
+    Write-Output '[OK] OCR pipeline: ready.'
     $resourceSummary = Get-ResourceSummary
     if (-not [String]::IsNullOrWhiteSpace($resourceSummary)) {
         Write-Output "[i] Resources after warmup: $resourceSummary"

@@ -5,10 +5,10 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from math import ceil, floor
+from math import atan2, ceil, floor, hypot
 from uuid import uuid4
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.core.database import Database
 from app.core.storage import FileStorage
@@ -55,6 +55,115 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _polygon_area(points: tuple[tuple[float, float], ...]) -> float:
+    return 0.5 * sum(
+        left[0] * right[1] - right[0] * left[1]
+        for left, right in zip(points, (*points[1:], points[0]), strict=True)
+    )
+
+
+def _ordered_quad(points: tuple[tuple[float, float], ...]) -> tuple[tuple[float, float], ...] | None:
+    if len(points) != 4 or abs(_polygon_area(points)) < 1e-8:
+        return None
+    center_x = sum(point[0] for point in points) / 4
+    center_y = sum(point[1] for point in points) / 4
+    ordered = sorted(points, key=lambda point: atan2(point[1] - center_y, point[0] - center_x))
+    start = min(range(4), key=lambda index: (ordered[index][0] + ordered[index][1], ordered[index][1], ordered[index][0]))
+    ordered = tuple(ordered[(start + index) % 4] for index in range(4))
+    # The image-coordinate ordering must be TL, TR, BR, BL for the
+    # perspective transform.  Reverse a counter-clockwise input if needed.
+    if _polygon_area(ordered) < 0:
+        ordered = (ordered[0], ordered[3], ordered[2], ordered[1])
+    if abs(_polygon_area(ordered)) < 1e-8:
+        return None
+    return ordered
+
+
+def _is_axis_aligned_quad(points: tuple[tuple[float, float], ...]) -> bool:
+    return len(points) == 4 and all(
+        abs(left[0] - right[0]) < 1e-7 or abs(left[1] - right[1]) < 1e-7
+        for left, right in zip(points, (*points[1:], points[0]), strict=True)
+    )
+
+
+def _perspective_crop(
+    image: Image.Image,
+    polygon: tuple[tuple[float, float], ...],
+    padding_fraction: float,
+) -> Image.Image | None:
+    if _is_axis_aligned_quad(polygon):
+        return None
+    ordered = _ordered_quad(polygon)
+    if ordered is None:
+        return None
+    center_x = sum(point[0] for point in ordered) / 4
+    center_y = sum(point[1] for point in ordered) / 4
+    scale = 1.0 + 2.0 * padding_fraction
+    expanded = tuple(
+        (
+            max(0.0, min(1.0, center_x + (point[0] - center_x) * scale)),
+            max(0.0, min(1.0, center_y + (point[1] - center_y) * scale)),
+        )
+        for point in ordered
+    )
+    pixel_points = tuple((x * image.width, y * image.height) for x, y in expanded)
+    top_width = hypot(pixel_points[1][0] - pixel_points[0][0], pixel_points[1][1] - pixel_points[0][1])
+    bottom_width = hypot(pixel_points[2][0] - pixel_points[3][0], pixel_points[2][1] - pixel_points[3][1])
+    left_height = hypot(pixel_points[3][0] - pixel_points[0][0], pixel_points[3][1] - pixel_points[0][1])
+    right_height = hypot(pixel_points[2][0] - pixel_points[1][0], pixel_points[2][1] - pixel_points[1][1])
+    width = max(2, round(max(top_width, bottom_width)))
+    height = max(2, round(max(left_height, right_height)))
+    # PIL's QUAD source order is upper-left, lower-left, lower-right,
+    # upper-right; our canonical order is upper-left, upper-right,
+    # lower-right, lower-left.
+    source_quad = (
+        pixel_points[0][0], pixel_points[0][1],
+        pixel_points[3][0], pixel_points[3][1],
+        pixel_points[2][0], pixel_points[2][1],
+        pixel_points[1][0], pixel_points[1][1],
+    )
+    source = image.convert("RGB")
+    try:
+        return source.transform(
+            (width, height),
+            Image.Transform.QUAD,
+            source_quad,
+            resample=Image.Resampling.BICUBIC,
+        )
+    except (ValueError, OSError):
+        return None
+    finally:
+        source.close()
+
+
+def assess_line_crop(image: Image.Image) -> dict[str, object]:
+    """Return review-only geometry/content diagnostics for one immutable crop."""
+    width, height = int(image.width), int(image.height)
+    aspect_ratio = width / height if height else 0.0
+    sample = ImageOps.grayscale(image)
+    sample.thumbnail((512, 128), Image.Resampling.BILINEAR)
+    get_pixels = getattr(sample, "get_flattened_data", sample.getdata)
+    pixels = list(get_pixels())
+    ink_coverage = sum(pixel < 240 for pixel in pixels) / len(pixels) if pixels else 0.0
+    warnings: list[str] = []
+    if width < 16:
+        warnings.append("width_too_small")
+    if height < 16:
+        warnings.append("height_too_small")
+    if aspect_ratio < 0.25 or aspect_ratio > 20.0:
+        warnings.append("aspect_ratio_suspicious")
+    if ink_coverage < 0.005:
+        warnings.append("ink_coverage_low")
+    return {
+        "width": width,
+        "height": height,
+        "aspect_ratio": round(aspect_ratio, 4),
+        "ink_coverage": round(ink_coverage, 6),
+        "warnings": warnings,
+        "quality_warning": bool(warnings),
+    }
+
+
 def _crop_image(image: Image.Image, polygon: tuple[tuple[float, float], ...], padding_fraction: float) -> Image.Image:
     if not polygon:
         raise RecognitionInputInvalid("recognition_region_empty")
@@ -74,6 +183,13 @@ def _crop_image(image: Image.Image, polygon: tuple[tuple[float, float], ...], pa
         raise RecognitionInputInvalid("recognition_crop_invalid")
     if image.width < 2 or image.height < 2:
         raise RecognitionInputInvalid("recognition_page_too_small")
+    if len(polygon) == 4:
+        oriented = _perspective_crop(image, polygon, padding_fraction)
+        if oriented is not None:
+            if oriented.width < 2 or oriented.height < 2:
+                oriented.close()
+                raise RecognitionInputInvalid("recognition_crop_too_small")
+            return oriented
     pixel_left = min(image.width - 2, max(0, floor(left * image.width)))
     pixel_top = min(image.height - 2, max(0, floor(top * image.height)))
     pixel_right = min(image.width, max(pixel_left + 2, ceil(right * image.width)))

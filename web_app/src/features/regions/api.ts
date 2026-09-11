@@ -22,7 +22,7 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function isSource(value: unknown): value is RegionSource {
-  return value === 'craft' || value === 'kraken' || value === 'manual' || value === 'adjusted';
+  return value === 'craft' || value === 'kraken' || value === 'gemini_openrouter' || value === 'manual' || value === 'adjusted';
 }
 
 function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
@@ -74,7 +74,7 @@ function parseRegion(value: unknown): Region | null {
   if (source === 'craft' && (detectorVersion === null || detectorScore === null)) {
     return null;
   }
-  if (source === 'kraken' && detectorVersion === null) {
+  if ((source === 'kraken' || source === 'gemini_openrouter') && detectorVersion === null) {
     return null;
   }
   return {

@@ -52,10 +52,29 @@ import {
 import { loadRegionDraft, removeRegionDraft, saveRegionDraft } from '@features/regions/persistence';
 import { useAccess } from '@shared/access/AccessProvider';
 import { motionTransition, useAccessibleMotion } from '@shared/motion';
-import { Badge, Button, Card, LoadingState } from '@shared/ui';
+import { Badge, Button, Card, Icon, LoadingState } from '@shared/ui';
 
 type CanvasPoint = Readonly<{ x: number; y: number }>;
 type BusyAction = 'save' | 'confirm' | null;
+type RegionPanel = 'recognition' | 'selection' | 'view' | 'history';
+type MobileSheetLevel = 0 | 1 | 2;
+
+const regionPanels = [
+  {
+    id: 'recognition',
+    label: 'Распознавание текста',
+    shortLabel: 'Распознавание',
+    icon: 'sparkles',
+  },
+  { id: 'selection', label: 'Область текста', shortLabel: 'Область', icon: 'crop' },
+  { id: 'view', label: 'Вид изображения', shortLabel: 'Вид', icon: 'eye' },
+  { id: 'history', label: 'История изменений', shortLabel: 'История', icon: 'clock' },
+] as const satisfies readonly Readonly<{
+  id: RegionPanel;
+  label: string;
+  shortLabel: string;
+  icon: 'sparkles' | 'crop' | 'eye' | 'clock';
+}>[];
 
 type RegionDrag =
   | Readonly<{
@@ -106,6 +125,8 @@ function regionLabel(region: Region, position: number): string {
       ? 'CRAFT'
       : region.source === 'kraken'
         ? 'Kraken'
+        : region.source === 'gemini_openrouter'
+          ? 'Gemini OCR'
         : region.source === 'manual'
           ? 'ручная область'
           : 'исправленная область';
@@ -115,6 +136,7 @@ function regionLabel(region: Region, position: number): string {
 function sourceLabel(source: Region['source']): string {
   if (source === 'craft') return 'CRAFT';
   if (source === 'kraken') return 'Kraken';
+  if (source === 'gemini_openrouter') return 'Gemini OCR';
   if (source === 'manual') return 'ручной';
   return 'исправлен';
 }
@@ -141,6 +163,26 @@ function cloneHistory(items: readonly (readonly Region[])[]): Region[][] {
   return items.map((regions) => cloneRegions(regions));
 }
 
+function visibleRegionsViewport(
+  element: HTMLElement,
+  sheetLevel: MobileSheetLevel,
+): { width: number; height: number } {
+  if (window.innerWidth > 900) {
+    return { width: element.clientWidth, height: element.clientHeight };
+  }
+  const sheetHeight = Math.min(window.innerHeight * 0.72, 620);
+  const visibleSheetHeight =
+    sheetLevel === 0
+      ? 116
+      : sheetLevel === 1
+        ? Math.min(window.innerHeight * 0.48, 390)
+        : sheetHeight;
+  return {
+    width: element.clientWidth,
+    height: Math.max(160, element.clientHeight - visibleSheetHeight),
+  };
+}
+
 export default function RegionReviewRoute() {
   const { csrfToken, reconnect } = useAccess();
   const [params] = useSearchParams();
@@ -159,6 +201,11 @@ export default function RegionReviewRoute() {
   const regionDrag = useRef<RegionDrag | null>(null);
   const pan = useRef<PanDrag | null>(null);
   const pinch = useRef<Pinch | null>(null);
+  const sheetDrag = useRef<{
+    startY: number;
+    level: MobileSheetLevel;
+    moved: boolean;
+  } | null>(null);
   const viewHasBeenFit = useRef(false);
   const [asset, setAsset] = useState<PreparationAsset | null>(null);
   const [snapshot, setSnapshot] = useState<RegionSnapshot | null>(null);
@@ -174,6 +221,8 @@ export default function RegionReviewRoute() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState<RegionDraft | null>(null);
+  const [activePanel, setActivePanel] = useState<RegionPanel>('recognition');
+  const [mobileSheetLevel, setMobileSheetLevel] = useState<MobileSheetLevel>(1);
 
   const replaceLocalRegions = useCallback((next: readonly Region[]) => {
     const normalized = withContiguousOrder(next);
@@ -217,10 +266,51 @@ export default function RegionReviewRoute() {
     setView(
       fitTransform(
         { width: asset.width, height: asset.height },
-        { width: element.clientWidth, height: element.clientHeight },
+        visibleRegionsViewport(element, mobileSheetLevel),
       ),
     );
     viewHasBeenFit.current = true;
+  }, [asset, mobileSheetLevel, setView]);
+
+  function beginSheetDrag(event: PointerEvent<HTMLButtonElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    sheetDrag.current = { startY: event.clientY, level: mobileSheetLevel, moved: false };
+  }
+
+  function moveSheetDrag(event: PointerEvent<HTMLButtonElement>) {
+    const drag = sheetDrag.current;
+    if (!drag) return;
+    const delta = drag.startY - event.clientY;
+    if (Math.abs(delta) > 12) drag.moved = true;
+    if (delta > 56) setMobileSheetLevel(Math.min(2, drag.level + 1) as MobileSheetLevel);
+    if (delta < -56) setMobileSheetLevel(Math.max(0, drag.level - 1) as MobileSheetLevel);
+  }
+
+  function endSheetDrag() {
+    const drag = sheetDrag.current;
+    sheetDrag.current = null;
+    if (drag && !drag.moved) {
+      setMobileSheetLevel((current) => (current === 0 ? 1 : 0));
+    }
+  }
+
+  useEffect(() => {
+    const element = viewport.current;
+    if (!asset || !element) return;
+
+    const zoomWithWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const box = element.getBoundingClientRect();
+      setView((current) =>
+        zoomTransform(current, event.deltaY < 0 ? 1.15 : 1 / 1.15, {
+          x: event.clientX - box.left,
+          y: event.clientY - box.top,
+        }),
+      );
+    };
+
+    element.addEventListener('wheel', zoomWithWheel, { passive: false });
+    return () => element.removeEventListener('wheel', zoomWithWheel);
   }, [asset]);
 
   const load = useCallback(
@@ -830,7 +920,7 @@ export default function RegionReviewRoute() {
       : null;
   const jobStatus = job
     ? job.state === 'awaiting_region_review'
-        ? 'Детектор завершил поиск строк: подтвердите области, чтобы продолжить распознавание.'
+      ? 'Детектор завершил поиск строк: подтвердите области, чтобы продолжить распознавание.'
       : `Задача: ${job.stage}. Серверное состояние будет обновлено автоматически.`
     : 'Проверяйте реальные области, возвращённые активным детектором.';
 
@@ -901,16 +991,6 @@ export default function RegionReviewRoute() {
             onPointerMove={moveCanvasPointer}
             onPointerUp={endCanvasPointer}
             onPointerCancel={(event) => endCanvasPointer(event, true)}
-            onWheel={(event) => {
-              event.preventDefault();
-              const box = event.currentTarget.getBoundingClientRect();
-              setView((current) =>
-                zoomTransform(current, event.deltaY < 0 ? 1.15 : 1 / 1.15, {
-                  x: event.clientX - box.left,
-                  y: event.clientY - box.top,
-                }),
-              );
-            }}
           >
             <img
               className="regions-canvas__image"
@@ -1036,178 +1116,303 @@ export default function RegionReviewRoute() {
           </p>
         </section>
 
-        <aside className="regions-sidebar" aria-label="Список и управление областями">
-          <Card className="regions-actions-card">
-            <div>
-              <p className="eyebrow">Области</p>
-              <h2>
-                {regions.length} {regions.length === 1 ? 'строка' : 'строк'}
-              </h2>
-            </div>
-            <div className="regions-inline-actions">
-              <Button variant="secondary" onClick={addCenteredRegion}>
-                Добавить область
-              </Button>
-              <Button variant="quiet" disabled={!history.length} onClick={undo}>
-                Отменить
-              </Button>
-              <Button variant="quiet" disabled={!redo.length} onClick={redoEdit}>
-                Повторить
-              </Button>
-            </div>
-          </Card>
+        <aside
+          className="regions-sidebar"
+          data-sheet-level={mobileSheetLevel}
+          aria-label="Инструменты распознавания и управления областями"
+        >
+          <button
+            className="regions-sidebar__handle"
+            type="button"
+            aria-label={mobileSheetLevel === 0 ? 'Развернуть инструменты' : 'Свернуть инструменты'}
+            aria-expanded={mobileSheetLevel !== 0}
+            onPointerDown={beginSheetDrag}
+            onPointerMove={moveSheetDrag}
+            onPointerUp={endSheetDrag}
+            onPointerCancel={() => {
+              sheetDrag.current = null;
+            }}
+          >
+            <span />
+          </button>
 
-          <Card className="regions-list-card">
-            <h2 className="visually-hidden">Список областей</h2>
-            {regions.length ? (
-              <ol className="regions-list">
-                {regions.map((region, index) => (
-                  <li key={region.id}>
-                    <button
-                      className={
-                        selectedIds.includes(region.id)
-                          ? 'regions-list__item regions-list__item--selected'
-                          : 'regions-list__item'
-                      }
-                      type="button"
-                      aria-pressed={selectedIds.includes(region.id)}
-                      onClick={(event) => {
-                        if (event.shiftKey) toggleSelection(region.id);
-                        else selectOnly(region.id);
-                      }}
-                    >
-                      <span className="regions-list__number">{index + 1}</span>
-                      <span className="regions-list__copy">
-                        <strong>{regionLabel(region, index)}</strong>
-                        <span>
-                          {region.flags.length ? region.flags.join(', ') : 'Без review flags'}
-                        </span>
-                      </span>
-                <Badge tone={region.source === 'craft' || region.source === 'kraken' ? 'info' : 'warning'}>
-                        {sourceLabel(region.source)}
-                      </Badge>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="regions-empty-list">
-                Детектор ещё не вернул строк или области были удалены вручную.
-              </p>
-            )}
-          </Card>
-
-          <Card className="regions-properties-card">
-            <p className="eyebrow">Выбранные области</p>
-            {selectedRegion && selectedBounds ? (
-              <>
-                <h2>
-                  {selectedRegions.length > 1
-                    ? `Выбрано: ${selectedRegions.length}`
-                    : 'Свойства строки'}
-                </h2>
-                {selectedRegions.length === 1 ? (
-                  <div className="regions-fields">
-                    {(
-                      [
-                        ['minX', 'Левый край'],
-                        ['minY', 'Верхний край'],
-                        ['maxX', 'Правый край'],
-                        ['maxY', 'Нижний край'],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <label key={key}>
-                        {label}
-                        <input
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.001"
-                          value={selectedBounds[key]}
-                          onChange={(event) => updateSelectedBounds(key, event.target.value)}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <p>Выберите две или больше областей с Shift, чтобы объединить их.</p>
-                )}
-                <p className="regions-properties__meta">
-                  Источник: {sourceLabel(selectedRegion.source)}. Flags:{' '}
-                  {selectedRegion.flags.length ? selectedRegion.flags.join(', ') : 'нет'}.
-                </p>
-                <div className="regions-button-grid">
-                  <Button
-                    variant="secondary"
-                    onClick={() => splitSelected('horizontal')}
-                    disabled={selectedRegions.length !== 1}
-                  >
-                    Разделить сверху/снизу
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => splitSelected('vertical')}
-                    disabled={selectedRegions.length !== 1}
-                  >
-                    Разделить слева/справа
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={mergeSelected}
-                    disabled={selectedRegions.length < 2}
-                  >
-                    Объединить выбранные
-                  </Button>
-                  <Button variant="danger" onClick={deleteSelected} disabled={!selectedIds.length}>
-                    Удалить выбранные
-                  </Button>
-                </div>
-                {selectedRegions.length === 1 ? (
-                  <div className="regions-order-actions">
-                    <Button
-                      variant="quiet"
-                      disabled={selectedRegion.readingOrder === 0}
-                      onClick={() =>
-                        applyEdit(moveReadingOrder(regionsRef.current, selectedRegion.id, -1))
-                      }
-                    >
-                      Раньше в порядке
-                    </Button>
-                    <Button
-                      variant="quiet"
-                      disabled={selectedRegion.readingOrder === regions.length - 1}
-                      onClick={() =>
-                        applyEdit(moveReadingOrder(regionsRef.current, selectedRegion.id, 1))
-                      }
-                    >
-                      Позже в порядке
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <p>Выберите область на изображении или в доступном списке.</p>
-            )}
-          </Card>
-
-          <Card className="regions-save-card">
-            <p className="eyebrow">Состояние</p>
-            <h2>{isDirty ? 'Есть несохранённые правки' : 'Сохранено на сервере'}</h2>
-            <div className="regions-save-actions">
-              <Button
-                variant="secondary"
-                disabled={busy !== null}
-                onClick={() => void reloadServerVersion()}
+          <div className="regions-panel-tabs" role="tablist" aria-label="Разделы редактора">
+            {regionPanels.map((panel) => (
+              <button
+                key={panel.id}
+                id={`regions-tab-${panel.id}`}
+                type="button"
+                role="tab"
+                aria-label={panel.label}
+                aria-selected={activePanel === panel.id}
+                aria-controls="regions-panel-content"
+                onClick={() => {
+                  setActivePanel(panel.id);
+                  if (mobileSheetLevel === 0) setMobileSheetLevel(1);
+                }}
               >
-                Версия сервера
+                <Icon name={panel.icon} />
+                <span>{panel.shortLabel}</span>
+              </button>
+            ))}
+          </div>
+
+          <div
+            className="regions-panel-content"
+            id="regions-panel-content"
+            role="tabpanel"
+            aria-labelledby={`regions-tab-${activePanel}`}
+          >
+            <Card
+              hidden={activePanel !== 'recognition'}
+              className={`regions-actions-card regions-panel-card ${activePanel === 'recognition' ? 'is-active' : ''}`}
+            >
+              <div>
+                <p className="eyebrow">Распознавание текста</p>
+                <h2>
+                  {regions.length} {regions.length === 1 ? 'строка' : 'строк'}
+                </h2>
+              </div>
+              <div className="regions-inline-actions">
+                <Button variant="secondary" onClick={addCenteredRegion}>
+                  Добавить область
+                </Button>
+                <Button variant="quiet" disabled={!history.length} onClick={undo}>
+                  Отменить
+                </Button>
+                <Button variant="quiet" disabled={!redo.length} onClick={redoEdit}>
+                  Повторить
+                </Button>
+              </div>
+            </Card>
+
+            <Card
+              hidden={activePanel !== 'recognition'}
+              className={`regions-list-card regions-panel-card ${activePanel === 'recognition' ? 'is-active' : ''}`}
+            >
+              <h2 className="visually-hidden">Список областей</h2>
+              {regions.length ? (
+                <ol className="regions-list">
+                  {regions.map((region, index) => (
+                    <li key={region.id}>
+                      <button
+                        className={
+                          selectedIds.includes(region.id)
+                            ? 'regions-list__item regions-list__item--selected'
+                            : 'regions-list__item'
+                        }
+                        type="button"
+                        aria-pressed={selectedIds.includes(region.id)}
+                        onClick={(event) => {
+                          if (event.shiftKey) toggleSelection(region.id);
+                          else selectOnly(region.id);
+                        }}
+                      >
+                        <span className="regions-list__number">{index + 1}</span>
+                        <span className="regions-list__copy">
+                          <strong>{regionLabel(region, index)}</strong>
+                          <span>
+                            Порядок {index + 1} · X {regionBounds(region).minX.toFixed(3)} · Y{' '}
+                            {regionBounds(region).minY.toFixed(3)}
+                            {region.flags.length ? ` · ${region.flags.join(', ')}` : ''}
+                          </span>
+                        </span>
+                        <Badge
+                          tone={
+                            region.source === 'craft' ||
+                            region.source === 'kraken' ||
+                            region.source === 'gemini_openrouter'
+                              ? 'info'
+                              : 'warning'
+                          }
+                        >
+                          {sourceLabel(region.source)}
+                        </Badge>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="regions-empty-list">
+                  Детектор ещё не вернул строк или области были удалены вручную.
+                </p>
+              )}
+            </Card>
+
+            <Card
+              hidden={activePanel !== 'selection'}
+              className={`regions-properties-card regions-panel-card ${activePanel === 'selection' ? 'is-active' : ''}`}
+            >
+              <p className="eyebrow">Выбранные области</p>
+              {selectedRegion && selectedBounds ? (
+                <>
+                  <h2>
+                    {selectedRegions.length > 1
+                      ? `Выбрано: ${selectedRegions.length}`
+                      : 'Свойства строки'}
+                  </h2>
+                  {selectedRegions.length === 1 ? (
+                    <div className="regions-fields">
+                      {(
+                        [
+                          ['minX', 'Левый край'],
+                          ['minY', 'Верхний край'],
+                          ['maxX', 'Правый край'],
+                          ['maxY', 'Нижний край'],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <label key={key}>
+                          {label}
+                          <input
+                            type="number"
+                            min="0"
+                            max="1"
+                            step="0.001"
+                            value={selectedBounds[key]}
+                            onChange={(event) => updateSelectedBounds(key, event.target.value)}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Выберите две или больше областей с Shift, чтобы объединить их.</p>
+                  )}
+                  <p className="regions-properties__meta">
+                    Источник: {sourceLabel(selectedRegion.source)}. Flags:{' '}
+                    {selectedRegion.flags.length ? selectedRegion.flags.join(', ') : 'нет'}.
+                    {selectedRegion.detectorScore !== null
+                      ? ` Уверенность: ${Math.round(selectedRegion.detectorScore * 100)}%.`
+                      : ''}
+                  </p>
+                  <div className="regions-button-grid">
+                    <Button
+                      variant="secondary"
+                      onClick={() => splitSelected('horizontal')}
+                      disabled={selectedRegions.length !== 1}
+                    >
+                      Разделить сверху/снизу
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => splitSelected('vertical')}
+                      disabled={selectedRegions.length !== 1}
+                    >
+                      Разделить слева/справа
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={mergeSelected}
+                      disabled={selectedRegions.length < 2}
+                    >
+                      Объединить выбранные
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={deleteSelected}
+                      disabled={!selectedIds.length}
+                    >
+                      Удалить выбранные
+                    </Button>
+                  </div>
+                  {selectedRegions.length === 1 ? (
+                    <div className="regions-order-actions">
+                      <Button
+                        variant="quiet"
+                        disabled={selectedRegion.readingOrder === 0}
+                        onClick={() =>
+                          applyEdit(moveReadingOrder(regionsRef.current, selectedRegion.id, -1))
+                        }
+                      >
+                        Раньше в порядке
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        disabled={selectedRegion.readingOrder === regions.length - 1}
+                        onClick={() =>
+                          applyEdit(moveReadingOrder(regionsRef.current, selectedRegion.id, 1))
+                        }
+                      >
+                        Позже в порядке
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <p>Выберите область на изображении или в доступном списке.</p>
+              )}
+            </Card>
+
+            <Card
+              hidden={activePanel !== 'view'}
+              className={`regions-view-card regions-panel-card ${activePanel === 'view' ? 'is-active' : ''}`}
+            >
+              <p className="eyebrow">Навигация</p>
+              <h2>Масштаб и разметка</h2>
+              <p>Изменения вида не влияют на итоговые координаты строк.</p>
+              <div className="regions-view-zoom">
+                <button
+                  type="button"
+                  aria-label="Уменьшить масштаб"
+                  onClick={() =>
+                    setView((current) => zoomTransform(current, 1 / 1.2, { x: 0, y: 0 }))
+                  }
+                >
+                  <Icon name="zoom-out" />
+                </button>
+                <output>{Math.round(view.scale * 100)}%</output>
+                <button
+                  type="button"
+                  aria-label="Увеличить масштаб"
+                  onClick={() => setView((current) => zoomTransform(current, 1.2, { x: 0, y: 0 }))}
+                >
+                  <Icon name="zoom-in" />
+                </button>
+              </div>
+              <Button variant="secondary" onClick={resetView}>
+                <Icon name="fit" />
+                Вписать изображение
               </Button>
-            </div>
-            {message ? (
-              <p className="regions-message" role="alert">
-                {message}
-              </p>
-            ) : null}
-          </Card>
+              <Button
+                variant={drawMode ? 'primary' : 'secondary'}
+                aria-pressed={drawMode}
+                onClick={() => setDrawMode((current) => !current)}
+              >
+                {drawMode ? 'Закончить добавление' : 'Нарисовать область'}
+              </Button>
+            </Card>
+
+            <Card
+              hidden={activePanel !== 'history'}
+              className={`regions-save-card regions-panel-card ${activePanel === 'history' ? 'is-active' : ''}`}
+            >
+              <p className="eyebrow">Состояние</p>
+              <h2>{isDirty ? 'Есть несохранённые правки' : 'Сохранено на сервере'}</h2>
+              <div className="regions-history-actions">
+                <Button variant="secondary" disabled={!history.length} onClick={undo}>
+                  <Icon name="undo" />
+                  Отменить
+                </Button>
+                <Button variant="secondary" disabled={!redo.length} onClick={redoEdit}>
+                  <Icon name="redo" />
+                  Вернуть
+                </Button>
+              </div>
+              <div className="regions-save-actions">
+                <Button
+                  variant="secondary"
+                  disabled={busy !== null}
+                  onClick={() => void reloadServerVersion()}
+                >
+                  Версия сервера
+                </Button>
+              </div>
+              {message ? (
+                <p className="regions-message" role="alert">
+                  {message}
+                </p>
+              ) : null}
+            </Card>
+          </div>
         </aside>
       </div>
     </section>
