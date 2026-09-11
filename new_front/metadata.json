@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Tajik HTR Studio",
+  "description": "Tajik Handwritten Text Recognition Studio",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

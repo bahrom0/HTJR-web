@@ -14,11 +14,12 @@ export function Layout() {
       <header className="sticky top-4 md:top-6 z-50 px-4 md:px-8 max-w-7xl mx-auto w-full flex justify-between items-center pointer-events-none">
         <nav className="navigation px-5 md:px-6 py-2.5 md:py-3 flex items-center gap-6 md:gap-8 pointer-events-auto">
           <MotionLink whileTap={{ scale: 0.95 }} to="/" className={`text-sm tracking-wide transition-colors ${location.pathname === '/' ? 'font-medium opacity-100' : 'opacity-60 hover:opacity-100'}`}>{t('home')}</MotionLink>
+          <MotionLink whileTap={{ scale: 0.95 }} to="/dashboard" className={`text-sm tracking-wide transition-colors ${location.pathname === '/dashboard' ? 'font-medium opacity-100' : 'opacity-60 hover:opacity-100'}`}>{t('dashboard')}</MotionLink>
           <MotionLink whileTap={{ scale: 0.95 }} to="/documents" className={`text-sm tracking-wide transition-colors ${location.pathname.startsWith('/documents') ? 'font-medium opacity-100' : 'opacity-60 hover:opacity-100'}`}>{t('documents')}</MotionLink>
         </nav>
         
         <div className="navigation px-3 md:px-4 py-1.5 md:py-2 flex items-center gap-4 pointer-events-auto">
-           <MotionLink whileTap={{ scale: 0.9 }} to="/settings" className="opacity-60 hover:opacity-100 transition-opacity p-2 block">
+           <MotionLink whileTap={{ scale: 0.9 }} to="/settings" className="opacity-60 hover:opacity-100 transition-opacity p-2 block" title={t('settings')}>
              <Settings className="w-5 h-5 stroke-[1.5]" />
            </MotionLink>
         </div>

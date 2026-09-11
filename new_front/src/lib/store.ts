@@ -40,6 +40,7 @@ interface AppState {
   setLanguage: (lang: Language) => void;
   setUser: (user: any) => void;
   logout: () => void;
+  setDocuments: (documents: Document[]) => void;
   addDocument: (doc: Document) => void;
   updateDocument: (id: string, data: Partial<Document>) => void;
   deleteDocument: (id: string) => void;
@@ -65,30 +66,28 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       theme: 'light',
       language: 'ru',
-      user: null,
+      user: {
+        id: 'anonymous',
+        email: 'user@htr.local',
+        name: 'Пользователь',
+        verified: true,
+        createdAt: new Date().toISOString(),
+      },
       preferences: defaultPreferences,
-      documents: [
-        {
-          id: '1',
-          name: 'Manuscript_page_01.jpg',
-          status: 'ready',
-          updatedAt: new Date().toISOString(),
-          pageCount: 1,
-          step: 'result'
-        },
-        {
-          id: '2',
-          name: 'Historical_doc_scan.png',
-          status: 'draft',
-          updatedAt: new Date(Date.now() - 86400000).toISOString(),
-          pageCount: 1,
-          step: 'prepare'
-        }
-      ],
+      documents: [],
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setUser: (user) => set({ user }),
-      logout: () => set({ user: null }),
+      logout: () => set({
+        user: {
+          id: 'anonymous',
+          email: 'user@htr.local',
+          name: 'Пользователь',
+          verified: true,
+          createdAt: new Date().toISOString(),
+        }
+      }),
+      setDocuments: (documents) => set({ documents }),
       addDocument: (doc) => set((state) => ({ documents: [doc, ...state.documents] })),
       updateDocument: (id, data) => set((state) => ({
         documents: state.documents.map(d => d.id === id ? { ...d, ...data } : d)

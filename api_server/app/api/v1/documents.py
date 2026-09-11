@@ -1,21 +1,27 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
+import logging
 import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import PurePath
+from typing import Any
 from urllib.parse import unquote
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request, File, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from PIL import Image, ImageOps
 
 from app.api.dependencies import AuthenticatedSession, require_mutation_session, require_session
 from app.core.errors import ApiError
+from app.ml.gemini_runtime import GeminiOcrRuntime
+
+logger = logging.getLogger(__name__)
 from app.services.images import (
     PIPELINE_VERSION,
     QUALITY_THRESHOLD_VERSION,
@@ -844,3 +850,221 @@ def preview_line_crop(
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+@router.post("/documents/upload", response_model=UploadResponse, status_code=201)
+async def upload_document_file(
+    request: Request,
+    session: AuthenticatedSession = Depends(require_session),
+) -> UploadResponse:
+    content = await request.body()
+    if not content:
+        raise ApiError(422, "upload_empty", "The uploaded file is empty.")
+
+    settings = request.app.state.settings
+    if len(content) > settings.upload_max_bytes:
+        raise ApiError(413, "upload_too_large", "The file exceeds the upload byte limit.")
+
+    now = datetime.now(UTC).isoformat()
+    document_id, page_id, asset_id = str(uuid4()), str(uuid4()), str(uuid4())
+    storage_key = f"{session.id[:8]}/{asset_id}.png"
+
+    # Validate image
+    try:
+        pil_img = Image.open(io.BytesIO(content))
+        pil_img = ImageOps.exif_transpose(pil_img)
+        width, height = pil_img.width, pil_img.height
+        media_type = request.headers.get("content-type") or "image/png"
+    except Exception as e:
+        raise ApiError(422, "invalid_image", "Failed to parse uploaded image.") from e
+
+    # Save to storage (Supabase or local)
+    storage = request.app.state.storage
+    if hasattr(storage, "upload"):
+        storage.upload(storage_key, content, content_type=media_type)
+    else:
+        dest = storage.resolve(storage_key, temporary=False)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(content)
+
+    filename = _safe_filename(request.headers.get("X-Original-Filename")) or "Manuscript.png"
+    title = PurePath(filename).stem[:160]
+
+    with request.app.state.database.transaction(immediate=True) as connection:
+        connection.execute(
+            "INSERT INTO documents(id,owner_session_id,title,status,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+            (document_id, session.id, title, "draft", now, now)
+        )
+        connection.execute(
+            """INSERT INTO assets(id,owner_session_id,document_id,storage_key,sha256,byte_size,media_type,state,created_at,original_filename,kind,width,height)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (asset_id, session.id, document_id, storage_key, hashlib.sha256(content).hexdigest(), len(content), media_type, "committed", now, filename, "original", width, height)
+        )
+        connection.execute(
+            "INSERT INTO pages(id,document_id,source_asset_id,page_index,created_at,updated_at) VALUES (?,?,?,0,?,?)",
+            (page_id, document_id, asset_id, now, now)
+        )
+
+    return UploadResponse(
+        document_id=document_id,
+        page_id=page_id,
+        asset=AssetResponse(
+            id=asset_id,
+            media_type=media_type,
+            width=width,
+            height=height,
+            preview_url=f"/api/v1/assets/{asset_id}/preview",
+        ),
+    )
+
+
+class SynchronousRecognitionResponse(BaseModel):
+    document_id: str
+    page_id: str
+    raw_text: str
+    lines: list[dict[str, Any]]
+
+
+@router.post("/documents/{document_id}/pages/{page_id}/recognize", response_model=SynchronousRecognitionResponse)
+def recognize_document_page(
+    document_id: str,
+    page_id: str,
+    request: Request,
+    session: AuthenticatedSession = Depends(require_session),
+) -> SynchronousRecognitionResponse:
+    settings = request.app.state.settings
+    if not settings.openrouter_api_key:
+        raise ApiError(500, "ocr_not_configured", "OPENROUTER_API_KEY is not configured.")
+
+    # 1. Fetch page and asset
+    with request.app.state.database.connect() as conn:
+        row = conn.execute(
+            """SELECT p.id as page_id, p.document_id,
+                      COALESCE(p.prepared_asset_id, p.source_asset_id) as active_asset_id
+               FROM pages p
+               JOIN documents d ON d.id = p.document_id
+               WHERE p.id = ? AND p.document_id = ? AND d.owner_session_id = ?""",
+            (page_id, document_id, session.id)
+        ).fetchone()
+
+        if not row:
+            # Fallback check by document_id alone
+            row = conn.execute(
+                """SELECT p.id as page_id, p.document_id,
+                          COALESCE(p.prepared_asset_id, p.source_asset_id) as active_asset_id
+                   FROM pages p
+                   JOIN documents d ON d.id = p.document_id
+                   WHERE p.document_id = ? AND d.owner_session_id = ?
+                   ORDER BY p.page_index ASC LIMIT 1""",
+                (document_id, session.id)
+            ).fetchone()
+
+        if not row:
+            raise ApiError(404, "page_not_found", "Document or page was not found.")
+
+        asset_id = row["active_asset_id"]
+        actual_page_id = row["page_id"]
+
+        asset_row = conn.execute(
+            "SELECT storage_key FROM assets WHERE id = ?",
+            (asset_id,)
+        ).fetchone()
+        if not asset_row:
+            raise ApiError(404, "asset_not_found", "Asset file was not found.")
+
+    storage_key = asset_row["storage_key"]
+    storage = request.app.state.storage
+    try:
+        if hasattr(storage, "download"):
+            data = storage.download(storage_key)
+        else:
+            data = storage.resolve(storage_key).read_bytes()
+        pil_image = Image.open(io.BytesIO(data))
+        pil_image = ImageOps.exif_transpose(pil_image).convert("RGB")
+    except Exception as e:
+        raise ApiError(422, "image_read_failed", f"Failed to load image: {e}")
+
+    # 2. Run OCR directly using OpenRouter / Gemini
+    runtime = GeminiOcrRuntime(
+        api_key=settings.openrouter_api_key,
+        model=settings.ocr_model,
+        timeout_seconds=settings.ocr_timeout_seconds,
+        thinking_level=settings.ocr_thinking_level,
+        max_output_tokens=settings.ocr_max_output_tokens,
+        max_page_regions=settings.ocr_max_page_regions,
+    )
+
+    try:
+        detection = runtime.detect_page(pil_image)
+    except Exception as e:
+        logger.exception("OCR recognition error: %s", e)
+        raise ApiError(502, "ocr_failed", f"AI recognition service error: {e}")
+
+    # 3. Save results to database
+    raw_lines = []
+    lines_output = []
+    now = datetime.now(UTC).isoformat()
+    job_id = str(uuid4())
+    run_id = str(uuid4())
+
+    with request.app.state.database.transaction(immediate=True) as conn:
+        conn.execute(
+            """INSERT INTO recognition_jobs (id, owner_session_id, document_id, state, revision, created_at, updated_at, started_at, finished_at)
+               VALUES (?, ?, ?, 'completed', 1, ?, ?, ?, ?)""",
+            (job_id, session.id, document_id, now, now, now, now)
+        )
+        conn.execute(
+            """INSERT INTO recognition_runs (id, job_id, attempt, started_at, finished_at, outcome)
+               VALUES (?, ?, 1, ?, ?, 'succeeded')""",
+            (run_id, job_id, now, now)
+        )
+
+        for i, region in enumerate(detection.regions):
+            region_id = str(uuid4())
+            line_id = str(uuid4())
+            text = region.text.strip()
+            raw_lines.append(text)
+            lines_output.append({"id": line_id, "position": i + 1, "text": text})
+
+            box_json = json.dumps(list(region.box_2d))
+            conn.execute(
+                """INSERT OR REPLACE INTO recognition_regions (id, page_id, polygon_json, reading_order, revision, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 1, ?, ?)""",
+                (region_id, actual_page_id, box_json, i + 1, now, now)
+            )
+            conn.execute(
+                """INSERT OR REPLACE INTO text_lines (id, region_id, line_index, bbox_json, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (line_id, region_id, i + 1, box_json, now, now)
+            )
+            conn.execute(
+                """INSERT OR REPLACE INTO text_versions (id, line_id, kind, text, revision, created_at, created_by_session_id)
+                   VALUES (?, ?, 'raw', ?, 1, ?, ?)""",
+                (str(uuid4()), line_id, text, now, session.id)
+            )
+            conn.execute(
+                """INSERT OR REPLACE INTO text_versions (id, line_id, kind, text, revision, created_at, created_by_session_id)
+                   VALUES (?, ?, 'confirmed', ?, 1, ?, ?)""",
+                (str(uuid4()), line_id, text, now, session.id)
+            )
+
+        full_raw_text = "\n".join(raw_lines)
+
+        conn.execute(
+            """INSERT INTO page_raw_results (id, recognition_run_id, page_id, owner_session_id, raw_text, is_partial, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?)""",
+            (str(uuid4()), run_id, actual_page_id, session.id, full_raw_text, now)
+        )
+
+        conn.execute(
+            "UPDATE documents SET status = 'ready', updated_at = ? WHERE id = ?",
+            (now, document_id)
+        )
+
+    return SynchronousRecognitionResponse(
+        document_id=document_id,
+        page_id=actual_page_id,
+        raw_text=full_raw_text,
+        lines=lines_output,
+    )
+

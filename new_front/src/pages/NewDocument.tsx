@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../lib/i18n';
 import { useAppStore } from '../lib/store';
-import { UploadCloud, FileImage } from 'lucide-react';
+import { api } from '../lib/api';
+import { UploadCloud, FileImage, Loader2 } from 'lucide-react';
 import { Reveal, AnimatedButton } from '../components/Animations';
 import { motion } from 'motion/react';
 
@@ -11,6 +12,7 @@ export function NewDocument() {
   const navigate = useNavigate();
   const addDocument = useAppStore(state => state.addDocument);
   const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -19,18 +21,33 @@ export function NewDocument() {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!file) return;
-    const newDocId = Math.random().toString(36).substring(7);
+    setUploading(true);
+    let docId = Math.random().toString(36).substring(7);
+    let previewUrl: string | undefined = undefined;
+
+    try {
+      const uploadRes = await api.uploadFile(file);
+      docId = uploadRes.document_id;
+      previewUrl = uploadRes.asset?.preview_url;
+    } catch (e) {
+      console.warn('Backend upload skipped/failed, proceeding with local object url', e);
+      previewUrl = URL.createObjectURL(file);
+    } finally {
+      setUploading(false);
+    }
+
     addDocument({
-      id: newDocId,
+      id: docId,
       name: file.name,
       status: 'draft',
       updatedAt: new Date().toISOString(),
       pageCount: 1,
-      step: 'prepare'
+      thumbnail: previewUrl,
+      step: 'prepare',
     });
-    navigate(`/documents/${newDocId}/pages/1/prepare`);
+    navigate(`/documents/${docId}/pages/1/prepare`);
   };
 
   return (
@@ -84,7 +101,10 @@ export function NewDocument() {
       
       <div className="flex gap-3 md:gap-4 w-full max-w-md">
          <AnimatedButton onClick={() => navigate(-1)} className="button-secondary flex-1 min-h-[48px] md:min-h-[52px]">{t('cancel')}</AnimatedButton>
-         <AnimatedButton onClick={handleContinue} disabled={!file} className="button-primary flex-1 min-h-[48px] md:min-h-[52px] disabled:opacity-50 transition-opacity">{t('continue')}</AnimatedButton>
+         <AnimatedButton onClick={handleContinue} disabled={!file || uploading} className="button-primary flex-1 min-h-[48px] md:min-h-[52px] disabled:opacity-50 transition-opacity inline-flex items-center justify-center gap-2">
+           {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+           {t('continue')}
+         </AnimatedButton>
       </div>
     </Reveal>
   );
