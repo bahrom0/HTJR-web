@@ -88,12 +88,13 @@ def read_settings(source: dict[str, str] | None = None, *, config_path: Path | N
     ocr_model = values.get("HTR_OCR_MODEL", values.get("HTR_GEMINI_MODEL", ocr_model))
     openrouter_api_key = values.get("OPENROUTER_API_KEY")
 
-    supabase_url = values.get("SUPABASE_URL", values.get("NEXT_PUBLIC_SUPABASE_URL", "https://ingsfsksbzxfdfqkbjgi.supabase.co"))
-    supabase_key = values.get("SUPABASE_KEY", values.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_OpJefXD_Ei9rcGtc94MXmA_eLOmfE2I"))
+    supabase_url = values.get("SUPABASE_URL")
+    supabase_key = values.get("SUPABASE_SERVICE_ROLE_KEY", values.get("SUPABASE_KEY"))
     supabase_bucket = values.get("SUPABASE_BUCKET", "htr-uploads")
 
     database_url = values.get("DATABASE_URL")
-    data_root = Path(values.get("HTR_DATA_ROOT", str(project_root / "data"))).resolve()
+    default_data_root = Path("/tmp/htr-data") if values.get("VERCEL") else project_root / "data"
+    data_root = Path(values.get("HTR_DATA_ROOT", str(default_data_root))).resolve()
     db_path = Path(values.get("HTR_DATABASE_PATH", str(data_root / "studio.sqlite3"))).resolve()
     storage_root = Path(values.get("HTR_STORAGE_ROOT", str(data_root / "assets"))).resolve()
 

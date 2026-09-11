@@ -1,29 +1,23 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "new_front/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api_server/app/main.py",
-      "use": "@vercel/python"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "cd new_front && bun install --frozen-lockfile",
+  "buildCommand": "cd new_front && bun run build",
+  "outputDirectory": "new_front/dist",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{api_server/tests/**,annotation_app/**,android/**,android_app_instructions/**,docs/**,final_product/**,HTR v2 CER/**,kraken_sidecar/**,raw_dataset/**,web_app/**,web_app_instructions/**,.tmp/**,.docx_*_qa/**,**/*.pptx,**/*.docx}"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "api_server/app/main.py"
+      "source": "/api/:path*",
+      "destination": "/api/index"
     },
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "new_front/index.html"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }
