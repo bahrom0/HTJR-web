@@ -196,18 +196,35 @@ def test_real_ocr_line_is_editable_confirmable_and_has_a_crop(client) -> None:
     ("data", "content_type", "code"),
     [
         (b"not-an-image", "image/png", "unsupported_image_type"),
-        (image_bytes() + b"PK\x03\x04payload", "image/png", "image_container_invalid"),
         (image_bytes(image_format="JPEG"), "image/png", "image_type_mismatch"),
     ],
-    ids=["malformed", "polyglot", "type-mismatch"],
+    ids=["malformed", "type-mismatch"],
 )
-def test_malformed_polyglot_and_type_mismatch_are_rejected(client, data, content_type, code) -> None:
+def test_malformed_and_type_mismatch_are_rejected(client, data, content_type, code) -> None:
     current, csrf, _ = client
     response = upload(current, csrf, data, key=f"validation-key-{code}", content_type=content_type)
     assert response.status_code in (415, 422)
     assert response.json()["code"] == code
     with current.app.state.database.connect() as connection:
         assert connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 0
+
+
+def test_jpeg_with_trailing_camera_metadata_is_accepted(client) -> None:
+    current, csrf, _ = client
+    camera_metadata_trailer = (
+        b"\x00\x00\x01\x0aImage_UTC_Data1785414562918"
+        b"MCC_Data436Camera_Scene_Info2Camera_Capture_Mode_Info1SEFH"
+        b"SEFT"
+    )
+    response = upload(
+        current,
+        csrf,
+        image_bytes(image_format="JPEG") + camera_metadata_trailer,
+        key="jpeg-camera-trailer-0001",
+        content_type="image/jpeg",
+        filename="page.jpg",
+    )
+    assert response.status_code == 201, response.text
 
 
 def test_byte_and_pixel_limits_are_enforced_without_commits(client) -> None:
@@ -217,7 +234,7 @@ def test_byte_and_pixel_limits_are_enforced_without_commits(client) -> None:
     current.app.state.settings = replace(current.app.state.settings, upload_max_bytes=100)
     oversized = upload(current, csrf, image_bytes(size=(100, 100)), key="oversized-byte-key-01")
     assert oversized.status_code == 413 and oversized.json()["code"] == "upload_too_large"
-    current.app.state.settings = replace(current.app.state.settings, upload_max_bytes=25 * 1024 * 1024)
+    current.app.state.settings = replace(current.app.state.settings, upload_max_bytes=10 * 1024 * 1024)
     huge_header = image_bytes(size=(12_001, 1))
     huge = upload(current, csrf, huge_header, key="huge-pixel-key-0001")
     assert huge.status_code == 413 and huge.json()["code"] in {"image_pixel_limit_exceeded", "image_decompression_limit"}

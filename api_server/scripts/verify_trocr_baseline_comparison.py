@@ -114,7 +114,7 @@ def _base_child(arguments: argparse.Namespace) -> int:
 
 def _adapter_child(arguments: argparse.Namespace) -> int:
     models_root = Path(__file__).resolve().parents[1] / "models"
-    runtime = TrocrRuntime(models_root, device=arguments.device)
+    runtime = TrocrRuntime(models_root, device=arguments.device, adapter_mode="rslora")
     image = None
     try:
         evidence = runtime.warmup()

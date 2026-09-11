@@ -2,6 +2,7 @@ import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { motionTransition, useAccessibleMotion } from '@shared/motion';
+import { Icon, type IconName } from '@shared/ui';
 
 import { ThemeContext, type ThemePreference } from './ThemeProvider';
 
@@ -12,6 +13,11 @@ const labels: Readonly<Record<ThemePreference, string>> = {
 };
 
 const preferences = Object.keys(labels) as ThemePreference[];
+const themeIcons: Readonly<Record<ThemePreference, IconName>> = {
+  light: 'sun',
+  dark: 'moon',
+  system: 'monitor',
+};
 
 export function ThemeToggle() {
   const theme = useContext(ThemeContext);
@@ -63,8 +69,14 @@ export function ThemeToggle() {
           }
         }}
       >
-        <span>{labels[theme.preference]}</span>
-        <svg aria-hidden="true" viewBox="0 0 16 16" focusable="false">
+        <Icon className="theme-toggle__mode-icon" name={themeIcons[theme.preference]} />
+        <span className="theme-toggle__label">{labels[theme.preference]}</span>
+        <svg
+          className="theme-toggle__chevron"
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          focusable="false"
+        >
           <path d="m4 6 4 4 4-4" />
         </svg>
       </button>

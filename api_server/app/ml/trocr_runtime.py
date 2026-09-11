@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-"""Worker-only local TrOCR + rsLoRA runtime.
+"""Worker-only local TrOCR runtime with an optional rsLoRA adapter.
 
 The API process may validate manifests, but it must never import or allocate the
-model.  This module deliberately imports torch/Transformers/PEFT lazily so the
-worker is the only process that owns inference memory.
+model.  This module deliberately imports torch/Transformers lazily so the
+worker is the only process that owns inference memory.  PEFT is imported only
+when the explicitly requested ``rslora`` compatibility mode is used.
 """
 
 import gc
@@ -42,7 +43,7 @@ class TrocrArtifactStatus:
 @dataclass(frozen=True, slots=True)
 class TrocrReadinessEvidence:
     model_version: str
-    adapter_version: str
+    adapter_version: str | None
     manifest_sha256: str
     device: str
     dtype: str
@@ -80,6 +81,58 @@ class _SafeTensorSpec:
     byte_size: int
 
 
+def _token_ids(value: int | Sequence[int] | None) -> set[int]:
+    if value is None:
+        return set()
+    if isinstance(value, int):
+        return {value}
+    return {int(item) for item in value}
+
+
+def _score_generated_tokens(
+    token_ids: Sequence[int],
+    token_scores: Sequence[float],
+    *,
+    eos_token_id: int | Sequence[int] | None,
+    pad_token_id: int | Sequence[int] | None,
+) -> tuple[float | None, int]:
+    """Return a per-sequence mean score and content-token count.
+
+    ``generate(..., output_scores=True)`` pads shorter rows to the longest row
+    in a batch.  This helper walks each row independently, ignores padding, and
+    stops at the first EOS.  EOS itself is intentionally excluded: the score is
+    meant to compare the recognized content of alternative observations.
+    """
+    eos_ids = _token_ids(eos_token_id)
+    pad_ids = _token_ids(pad_token_id)
+    usable_scores: list[float] = []
+    for token_id, score in zip(token_ids, token_scores, strict=False):
+        token_id = int(token_id)
+        if token_id in eos_ids:
+            break
+        if token_id in pad_ids:
+            continue
+        usable_scores.append(float(score))
+    if not usable_scores:
+        return None, 0
+    return sum(usable_scores) / len(usable_scores), len(usable_scores)
+
+
+def _generated_token_count(
+    token_ids: Sequence[int],
+    *,
+    eos_token_id: int | Sequence[int] | None,
+    pad_token_id: int | Sequence[int] | None,
+) -> int:
+    """Count content tokens in one generated row, excluding EOS/padding."""
+    return _score_generated_tokens(
+        token_ids,
+        [0.0] * len(token_ids),
+        eos_token_id=eos_token_id,
+        pad_token_id=pad_token_id,
+    )[1]
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -98,8 +151,10 @@ def _safe_artifact(root: Path, relative_path: str, expected_size: int, expected_
         return False
 
 
-def inspect_trocr_artifacts(models_root: Path) -> TrocrArtifactStatus:
-    """Validate only local, manifest-backed TrOCR and rsLoRA artifacts."""
+def inspect_trocr_artifacts(models_root: Path, *, adapter_mode: str = "none") -> TrocrArtifactStatus:
+    """Validate local manifest-backed artifacts for the requested runtime mode."""
+    if adapter_mode not in {"none", "rslora"}:
+        return TrocrArtifactStatus(False, "trocr_adapter_mode_invalid")
     root = models_root.resolve()
     manifest_path = root / "manifest.json"
     if not manifest_path.is_file():
@@ -116,15 +171,23 @@ def inspect_trocr_artifacts(models_root: Path) -> TrocrArtifactStatus:
         return TrocrArtifactStatus(False, "trocr_manifest_invalid")
     base = models.get("trocr")
     adapter = models.get("tajik_rslora")
-    if not isinstance(base, dict) or not isinstance(adapter, dict):
+    if not isinstance(base, dict):
+        return TrocrArtifactStatus(False, "trocr_manifest_invalid")
+    if adapter_mode == "rslora" and not isinstance(adapter, dict):
         return TrocrArtifactStatus(False, "trocr_manifest_invalid")
     model_version = base.get("version")
-    adapter_version = adapter.get("version")
-    if not isinstance(model_version, str) or not model_version or not isinstance(adapter_version, str) or not adapter_version:
+    adapter_version = adapter.get("version") if adapter_mode == "rslora" and isinstance(adapter, dict) else None
+    if not isinstance(model_version, str) or not model_version:
+        return TrocrArtifactStatus(False, "trocr_manifest_invalid")
+    if adapter_mode == "rslora" and (not isinstance(adapter_version, str) or not adapter_version):
         return TrocrArtifactStatus(False, "trocr_manifest_invalid")
     base_root = (root / "trocr").resolve()
-    adapter_root = (root / "tajik_rslora").resolve()
-    for group, group_root, expected_prefix in ((base, base_root, "trocr/"), (adapter, adapter_root, "tajik_rslora/")):
+    adapter_root = (root / "tajik_rslora").resolve() if adapter_mode == "rslora" else None
+    groups = [(base, base_root, "trocr/")]
+    if adapter_mode == "rslora":
+        assert isinstance(adapter, dict) and adapter_root is not None
+        groups.append((adapter, adapter_root, "tajik_rslora/"))
+    for group, group_root, expected_prefix in groups:
         artifacts = group.get("artifacts")
         if not isinstance(artifacts, list) or not artifacts:
             return TrocrArtifactStatus(False, "trocr_manifest_invalid")
@@ -146,12 +209,14 @@ def inspect_trocr_artifacts(models_root: Path) -> TrocrArtifactStatus:
             relative = path.removeprefix(expected_prefix)
             if not relative or "/" in relative or "\\" in relative or not _safe_artifact(group_root, relative, size, digest):
                 return TrocrArtifactStatus(False, "trocr_artifacts_corrupt", model_version, adapter_version)
-    try:
-        adapter_config = json.loads((adapter_root / "adapter_config.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return TrocrArtifactStatus(False, "rslora_config_invalid", model_version, adapter_version)
-    if adapter_config.get("use_rslora") is not True:
-        return TrocrArtifactStatus(False, "rslora_required", model_version, adapter_version)
+    if adapter_mode == "rslora":
+        assert adapter_root is not None
+        try:
+            adapter_config = json.loads((adapter_root / "adapter_config.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return TrocrArtifactStatus(False, "rslora_config_invalid", model_version, adapter_version)
+        if adapter_config.get("use_rslora") is not True:
+            return TrocrArtifactStatus(False, "rslora_required", model_version, adapter_version)
     return TrocrArtifactStatus(
         True,
         "ready",
@@ -365,22 +430,35 @@ def _load_windows_streamed_model(
         raise TrocrRuntimeError("trocr_streaming_weights_model_mismatch") from error
 
 
-def _runtime_modules() -> tuple[Any, Any, Any, Any, Any]:
+def _runtime_modules(*, include_peft: bool = False) -> tuple[Any, Any, Any, Any, Any]:
+    """Load inference modules lazily, importing PEFT only for adapter mode."""
     try:
         import torch
-        from peft import LoraConfig, inject_adapter_in_model, set_peft_model_state_dict
         from transformers import TrOCRProcessor, VisionEncoderDecoderModel
     except ImportError as error:
         raise TrocrRuntimeError("trocr_runtime_dependencies_missing") from error
+    if not include_peft:
+        return torch, None, None, None, (TrOCRProcessor, VisionEncoderDecoderModel)
+    try:
+        from peft import LoraConfig, inject_adapter_in_model, set_peft_model_state_dict
+    except ImportError as error:
+        raise TrocrRuntimeError("trocr_adapter_dependencies_missing") from error
     return torch, LoraConfig, inject_adapter_in_model, set_peft_model_state_dict, (TrOCRProcessor, VisionEncoderDecoderModel)
 
 
 class TrocrRuntime:
-    """A serialized local TrOCR + mandatory rsLoRA runtime for one worker."""
+    """A serialized local TrOCR runtime for one worker.
 
-    def __init__(self, models_root: Path, *, device: str = "auto") -> None:
+    ``none`` is the production path.  ``rslora`` is retained as an explicit
+    compatibility/diagnostic mode for the existing adapter artifacts.
+    """
+
+    def __init__(self, models_root: Path, *, device: str = "auto", adapter_mode: str = "none") -> None:
+        if adapter_mode not in {"none", "rslora"}:
+            raise ValueError("adapter_mode must be none or rslora")
         self.models_root = models_root
         self.requested_device = device
+        self.adapter_mode = adapter_mode
         self._lock = threading.Lock()
         self._model: Any | None = None
         self._processor: Any | None = None
@@ -390,7 +468,7 @@ class TrocrRuntime:
         self._pending_evidence: tuple[TrocrArtifactStatus, int, int, int] | None = None
 
     def artifact_status(self) -> TrocrArtifactStatus:
-        return inspect_trocr_artifacts(self.models_root)
+        return inspect_trocr_artifacts(self.models_root, adapter_mode=self.adapter_mode)
 
     @property
     def evidence(self) -> TrocrReadinessEvidence | None:
@@ -400,9 +478,15 @@ class TrocrRuntime:
         if self._model is not None and self._processor is not None:
             return
         status = self.artifact_status()
-        if not status.ready or status.base_root is None or status.adapter_root is None:
+        if not status.ready or status.base_root is None:
             raise TrocrRuntimeError(status.code)
-        torch, LoraConfig, inject_adapter_in_model, set_peft_model_state_dict, transformer_types = _runtime_modules()
+        if self.adapter_mode == "rslora":
+            torch, LoraConfig, inject_adapter_in_model, set_peft_model_state_dict, transformer_types = _runtime_modules(
+                include_peft=True
+            )
+        else:
+            torch, _unused_config, _unused_inject, _unused_set_state, transformer_types = _runtime_modules()
+            LoraConfig = inject_adapter_in_model = set_peft_model_state_dict = None
         TrOCRProcessor, VisionEncoderDecoderModel = transformer_types
         wants_cuda = self.requested_device == "cuda" or (self.requested_device == "auto" and torch.cuda.is_available())
         if self.requested_device == "cuda" and not torch.cuda.is_available():
@@ -417,7 +501,9 @@ class TrocrRuntime:
         # model's resident parameter storage roughly half that size.  Other
         # platforms preserve F32 CPU behavior.
         self._dtype = torch.float16 if wants_cuda or os.name == "nt" else torch.float32
-        adapter_state = None
+        adapter_state: dict[str, Any] = {}
+        lora_parameters: list[Any] = []
+        nonzero = 0
         try:
             # The approved adapter manifest does not include merges.txt.  The
             # base artifact does, so the processor is deliberately sourced from
@@ -442,22 +528,25 @@ class TrocrRuntime:
                     low_cpu_mem_usage=True,
                     use_safetensors=True,
                 )
-            adapter_config = LoraConfig.from_pretrained(status.adapter_root, local_files_only=True)
-            if getattr(adapter_config, "use_rslora", False) is not True:
-                raise TrocrRuntimeError("rslora_required")
-            adapter_state = _stream_safetensors_state(
-                status.adapter_root / "adapter_model.safetensors",
-                torch=torch,
-                device=torch.device("cpu"),
-            )
-            inject_adapter_in_model(adapter_config, model, low_cpu_mem_usage=False)
-            set_peft_model_state_dict(model, adapter_state)
-            lora_parameters = [parameter for name, parameter in model.named_parameters() if "lora_" in name]
-            if not lora_parameters:
-                raise TrocrRuntimeError("rslora_parameters_missing")
-            nonzero = sum(int(torch.count_nonzero(parameter.detach()).item()) for parameter in lora_parameters)
-            if nonzero == 0:
-                raise TrocrRuntimeError("rslora_parameters_zero")
+            if self.adapter_mode == "rslora":
+                if status.adapter_root is None or LoraConfig is None or inject_adapter_in_model is None or set_peft_model_state_dict is None:
+                    raise TrocrRuntimeError("rslora_artifacts_missing")
+                adapter_config = LoraConfig.from_pretrained(status.adapter_root, local_files_only=True)
+                if getattr(adapter_config, "use_rslora", False) is not True:
+                    raise TrocrRuntimeError("rslora_required")
+                adapter_state = _stream_safetensors_state(
+                    status.adapter_root / "adapter_model.safetensors",
+                    torch=torch,
+                    device=torch.device("cpu"),
+                )
+                inject_adapter_in_model(adapter_config, model, low_cpu_mem_usage=False)
+                set_peft_model_state_dict(model, adapter_state)
+                lora_parameters = [parameter for name, parameter in model.named_parameters() if "lora_" in name]
+                if not lora_parameters:
+                    raise TrocrRuntimeError("rslora_parameters_missing")
+                nonzero = sum(int(torch.count_nonzero(parameter.detach()).item()) for parameter in lora_parameters)
+                if nonzero == 0:
+                    raise TrocrRuntimeError("rslora_parameters_zero")
             tokenizer = processor.tokenizer
             for config in (model.config, model.generation_config):
                 config.decoder_start_token_id = tokenizer.eos_token_id
@@ -465,6 +554,7 @@ class TrocrRuntime:
                 config.eos_token_id = tokenizer.eos_token_id
             model.config.use_cache = True
             model.decoder.config.use_cache = True
+            model.generation_config.use_cache = True
             # The streaming path has already materialized every tensor on the
             # requested device and dtype.  Avoid a model-wide conversion here:
             # it would temporarily duplicate the full base model and defeat
@@ -506,7 +596,12 @@ class TrocrRuntime:
                 generated = self._model.generate(pixel_values, num_beams=1, max_new_tokens=4)
                 if self._device.type == "cuda":
                     torch.cuda.synchronize(self._device)
-            token_count = int(generated.shape[-1])
+            warmup_ids = generated[0, 1:].detach().cpu().tolist()
+            token_count = _generated_token_count(
+                warmup_ids,
+                eos_token_id=getattr(self._model.generation_config, "eos_token_id", None),
+                pad_token_id=getattr(self._model.generation_config, "pad_token_id", None),
+            )
         except Exception as error:
             raise TrocrRuntimeError("trocr_warmup_generate_failed") from error
         finally:
@@ -514,7 +609,7 @@ class TrocrRuntime:
             self._cleanup_memory(release_cuda_cache=False)
         self._evidence = TrocrReadinessEvidence(
             model_version=status.model_version or "unknown",
-            adapter_version=status.adapter_version or "unknown",
+            adapter_version=status.adapter_version,
             manifest_sha256=status.manifest_sha256 or "",
             device=str(self._device),
             dtype=str(self._dtype).removeprefix("torch."),
@@ -560,6 +655,19 @@ class TrocrRuntime:
                     torch.cuda.synchronize(self._device)
             texts = [text.strip() for text in self._processor.batch_decode(output.sequences, skip_special_tokens=True)]
             mean_token_log_probabilities: list[float | None] = [None] * len(texts)
+            decoding_steps = len(output.scores or ())
+            eos_token_id = getattr(self._model.generation_config, "eos_token_id", None)
+            pad_token_id = getattr(self._model.generation_config, "pad_token_id", None)
+            generated_token_counts: list[int] = []
+            for sequence in output.sequences:
+                sequence_ids = sequence[-decoding_steps:] if decoding_steps else sequence[1:]
+                generated_token_counts.append(
+                    _generated_token_count(
+                        sequence_ids.detach().cpu().tolist(),
+                        eos_token_id=eos_token_id,
+                        pad_token_id=pad_token_id,
+                    )
+                )
             if output.scores:
                 try:
                     transition_scores = self._model.compute_transition_scores(
@@ -569,8 +677,16 @@ class TrocrRuntime:
                         normalize_logits=True,
                     )
                     for index in range(len(texts)):
-                        generated_scores = transition_scores[index, -len(output.scores):]
-                        mean_token_log_probabilities[index] = float(generated_scores.detach().float().mean().cpu().item())
+                        sequence = output.sequences[index, -decoding_steps:]
+                        generated_scores = transition_scores[index, -decoding_steps:]
+                        mean_score, token_count = _score_generated_tokens(
+                            sequence.detach().cpu().tolist(),
+                            generated_scores.detach().float().cpu().tolist(),
+                            eos_token_id=eos_token_id,
+                            pad_token_id=pad_token_id,
+                        )
+                        mean_token_log_probabilities[index] = mean_score
+                        generated_token_counts[index] = token_count
                 except Exception:
                     # The generated text remains valid even when a Transformers
                     # version does not expose transition-score reconstruction.
@@ -580,8 +696,8 @@ class TrocrRuntime:
                 TrocrGeneration(
                     text=text,
                     duration_ms=duration_ms,
-                    generated_token_count=int(output.sequences.shape[-1]),
-                    decoding_steps=len(output.scores or ()),
+                    generated_token_count=generated_token_counts[index],
+                    decoding_steps=decoding_steps,
                     mean_token_log_probability=mean_token_log_probabilities[index],
                 )
                 for index, text in enumerate(texts)
@@ -592,6 +708,7 @@ class TrocrRuntime:
             raise TrocrRuntimeError("trocr_generate_failed") from error
         finally:
             del inputs, pixel_values, output
+
     def _cleanup_memory(self, *, release_cuda_cache: bool) -> None:
         try:
             torch, *_ = _runtime_modules()

@@ -21,6 +21,9 @@ class ReadinessService:
         self._jobs = JobRepository(database)
         self._stale_seconds = settings.worker_lease_seconds
         self._craft_enabled = settings.craft_enabled
+        self._trocr_adapter_mode = settings.trocr_adapter_mode
+        self._ocr_provider = settings.ocr_provider
+        self._gemini_mode = settings.gemini_mode
 
     def check(self) -> Readiness:
         if self._jobs.worker_is_fresh(stale_seconds=self._stale_seconds):
@@ -31,8 +34,12 @@ class ReadinessService:
         worker = self.check()
         if not worker.is_ready:
             return worker
-        detector_name = "craft" if self._craft_enabled else "kraken"
-        if self._craft_enabled:
+        detector_name = (
+            "gemini_openrouter"
+            if self._ocr_provider == "gemini" and self._gemini_mode == "page"
+            else "craft" if self._craft_enabled else "kraken"
+        )
+        if detector_name == "craft":
             detector = craft_status()
             if not detector.ready:
                 return Readiness(is_ready=False, code=detector.code)
@@ -44,8 +51,12 @@ class ReadinessService:
         detector = self.detector_check()
         if not detector.is_ready:
             return detector
+        if self._ocr_provider == "gemini":
+            if not self._jobs.model_is_ready("gemini_openrouter", stale_seconds=self._stale_seconds):
+                return Readiness(is_ready=False, code="gemini_openrouter_warmup_unavailable")
+            return Readiness(is_ready=True, code="ready")
         models_root = Path(__file__).resolve().parents[2] / "models"
-        trocr = inspect_trocr_artifacts(models_root)
+        trocr = inspect_trocr_artifacts(models_root, adapter_mode=self._trocr_adapter_mode)
         if not trocr.ready:
             return Readiness(is_ready=False, code=trocr.code)
         if not self._jobs.model_is_ready("trocr", stale_seconds=self._stale_seconds):

@@ -4,7 +4,7 @@ import io
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 import pytest
@@ -13,9 +13,17 @@ from PIL import Image
 from app.core.database import Database
 from app.core.storage import FileStorage
 from app.ml.craft_runtime import CraftDetection
+from app.ml.gemini_runtime import (
+    GeminiLineGeneration,
+    GeminiLineResult,
+    GeminiPageRegion,
+    GeminiPageResult,
+    GeminiUsage,
+)
 from app.ml.trocr_runtime import TrocrGeneration, TrocrReadinessEvidence, TrocrRuntimeError
 from app.repositories.jobs import JobRepository
 from app.repositories.recognition import RecognitionRepository
+from app.repositories.recognition import _crop_image, assess_line_crop
 from app.repositories.regions import RegionRepository
 from app.services.jobs import WorkerService
 from app.worker.main import run_page_recognition
@@ -104,6 +112,28 @@ class _FakeCraftRuntime:
         )
 
 
+class _FakeFragmentedCraftRuntime(_FakeCraftRuntime):
+    def detect(self, image: Image.Image) -> CraftDetection:
+        score_map = np.zeros((30, 60), dtype=np.float32)
+        return CraftDetection(
+            detector_version="fake-craft-fragmented-v1",
+            thresholds_version="fake-thresholds-v1",
+            width=image.width,
+            height=image.height,
+            text_score_map=score_map,
+            link_score_map=np.zeros_like(score_map),
+            boxes=((8.0, 42.0, 35.0, 50.0), (80.0, 42.0, 105.0, 50.0), (150.0, 42.0, 175.0, 50.0)),
+            polygons=(
+                ((8.0, 42.0), (35.0, 42.0), (35.0, 50.0), (8.0, 50.0)),
+                ((80.0, 42.0), (105.0, 42.0), (105.0, 50.0), (80.0, 50.0)),
+                ((150.0, 42.0), (175.0, 42.0), (175.0, 50.0), (150.0, 50.0)),
+            ),
+            scores=(0.95, 0.91, 0.89),
+            duration_ms=3,
+            warmup_ms=1,
+        )
+
+
 class _FakeTrocrRuntime:
     def __init__(self, *, fail_line: int | None = None, crash_line: int | None = None) -> None:
         self.evidence = TrocrReadinessEvidence(
@@ -130,16 +160,47 @@ class _FakeTrocrRuntime:
 
     def recognize(self, _image: Image.Image, *, num_beams: int, max_new_tokens: int) -> TrocrGeneration:
         self.calls += 1
-        if self.crash_line == self.calls:
+        line_number = (self.calls - 1) // 2 + 1
+        if self.crash_line == line_number:
             raise RuntimeError("simulated_worker_crash")
-        if self.fail_line == self.calls:
+        if self.fail_line == line_number:
             raise TrocrRuntimeError("trocr_generate_failed")
         return TrocrGeneration(
-            text=f"raw-line-{self.calls}",
+            text=f"raw-line-{line_number}",
             duration_ms=4,
             generated_token_count=5,
             decoding_steps=4,
             mean_token_log_probability=-0.25,
+        )
+
+
+class _FakeGeminiRuntime:
+    model = "google/gemini-3.8-flash:floor"
+    max_prompt_price = 0.4
+    max_completion_price = 2.0
+
+    def close(self) -> None:
+        return None
+
+    def detect(self, image: Image.Image) -> GeminiPageResult:
+        usage = GeminiUsage(300, 30, 330, 0.0002, "Google AI Studio")
+        return GeminiPageResult(
+            (
+                GeminiPageRegion(0, (80, 40, 300, 900), "черновик 1"),
+                GeminiPageRegion(1, (520, 40, 800, 900), "черновик 2"),
+            ),
+            usage,
+            25,
+            image.width,
+            image.height,
+            "google/gemini-3.8-flash",
+        )
+
+    def recognize_crops(self, images: list[Image.Image]) -> GeminiLineResult:
+        return GeminiLineResult(
+            tuple(GeminiLineGeneration(index, f"gemini-line-{index + 1}") for index, _ in enumerate(images)),
+            GeminiUsage(500, 20, 520, 0.0003, "Google AI Studio"),
+            40,
         )
 
 
@@ -169,6 +230,26 @@ def _service(
     )
 
 
+def _gemini_service(database: Database, storage: FileStorage, runtime: _FakeGeminiRuntime, *, worker_id: str) -> WorkerService:
+    repository = JobRepository(database)
+    return WorkerService(
+        repository,
+        worker_id=worker_id,
+        lease_seconds=30,
+        handlers={
+            "page_recognition": lambda context: run_page_recognition(
+                context,
+                database=database,
+                storage=storage,
+                models_root=storage.root / "models-without-weights",
+                craft_runtime=None,
+                trocr_runtime=None,
+                gemini_runtime=runtime,  # type: ignore[arg-type]
+            )
+        },
+    )
+
+
 @pytest.fixture
 def pipeline(tmp_path: Path) -> tuple[Database, FileStorage, JobRepository, str, str]:
     database = Database(tmp_path / "pipeline.sqlite3")
@@ -191,10 +272,64 @@ def _enqueue_and_detect(pipeline) -> tuple[object, str]:
         output = connection.execute(
             "SELECT recognition_run_id,thresholds_json,output_json FROM craft_detector_outputs WHERE job_id=?", (job.id,)
         ).fetchone()
+        audit = connection.execute(
+            "SELECT source_regions_json,line_regions_json,merges_json FROM line_reconstruction_audits WHERE job_id=?",
+            (job.id,),
+        ).fetchone()
     assert output is not None
     assert json.loads(output["thresholds_json"])["values"]["text"] == 0.7
-    assert json.loads(output["output_json"])["grouping"]["line_candidate_count"] == 2
+    output_payload = json.loads(output["output_json"])
+    assert output_payload["grouping"]["line_candidate_count"] == 2
+    assert output_payload["line_reconstruction"]["source_region_count"] == 2
+    assert output_payload["line_reconstruction"]["line_region_count"] == 2
+    assert audit is not None
+    assert len(json.loads(audit["source_regions_json"])) == 2
+    assert len(json.loads(audit["line_regions_json"])) == 2
+    assert json.loads(audit["merges_json"]) == []
     return waiting, str(page_revision)
+
+
+def test_demo_preset_uses_saved_regions_and_emits_line_progress(pipeline, monkeypatch) -> None:
+    database, storage, repository, owner, page_id = pipeline
+    with database.connect() as connection:
+        digest = connection.execute(
+            "SELECT a.sha256 FROM pages p JOIN assets a ON a.id=p.source_asset_id WHERE p.id=?", (page_id,)
+        ).fetchone()[0]
+    preset = [
+        {"id": f"preset-{index}", "reading_order": index, "text": text,
+         "polygon": [{"x": .05, "y": top}, {"x": .9, "y": top}, {"x": .9, "y": top + .15}, {"x": .05, "y": top + .15}]}
+        for index, (top, text) in enumerate(((.1, "demo-line-1"), (.5, "demo-line-2")))
+    ]
+    now = _now()
+    with database.transaction(immediate=True) as connection:
+        connection.execute(
+            """INSERT INTO demo_recognition_presets(image_sha256,raw_text,regions_json,created_at,updated_at)
+               VALUES (?,?,?,?,?)""", (digest, "demo-line-1\ndemo-line-2", json.dumps(preset), now, now),
+        )
+    monkeypatch.setattr("app.worker.main.time.sleep", lambda _seconds: None)
+    job, _ = repository.enqueue(owner, page_id, "demo-regions-job-1", priority=0, capacity=4, max_attempts=3)
+
+    class DetectorMustNotRun(_FakeCraftRuntime):
+        def detect(self, image): raise AssertionError("detector must be replaced by saved regions")
+
+    service = _service(database, storage, DetectorMustNotRun(), _FakeTrocrRuntime(crash_line=1), worker_id="demo-worker")
+    assert service.run_once() is True
+    waiting = repository.get(owner, job.id)
+    assert waiting.state == "awaiting_region_review"
+    page_revision, _confirmed, saved_regions = RegionRepository(database).list(owner, page_id)
+    assert len(saved_regions) == 2
+    repository.confirm_regions_and_resume(owner, page_id, expected_page_revision=page_revision, job_id=job.id, expected_job_revision=waiting.revision)
+    assert service.run_once() is True
+    completed = repository.get(owner, job.id)
+    assert completed.state == "completed"
+    with database.connect() as connection:
+        run_id = connection.execute("SELECT id FROM recognition_runs WHERE job_id=?", (job.id,)).fetchone()[0]
+        result = connection.execute("SELECT raw_text FROM page_raw_results WHERE recognition_run_id=?", (run_id,)).fetchone()[0]
+        line_count = connection.execute("SELECT COUNT(*) FROM recognition_line_results WHERE recognition_run_id=?", (run_id,)).fetchone()[0]
+        crop_count = connection.execute("SELECT COUNT(*) FROM recognition_line_crops WHERE recognition_run_id=?", (run_id,)).fetchone()[0]
+        progress = connection.execute("SELECT COUNT(*) FROM job_events WHERE job_id=? AND event_type='stage_progress'", (job.id,)).fetchone()[0]
+    assert result == "demo-line-1\ndemo-line-2"
+    assert (line_count, crop_count, progress) == (2, 2, 2)
 
 
 def test_durable_pipeline_pauses_for_review_then_assembles_raw_page(pipeline) -> None:
@@ -213,16 +348,109 @@ def test_durable_pipeline_pauses_for_review_then_assembles_raw_page(pipeline) ->
     completed = repository.get(owner, waiting.id)
     assert completed.state == "completed"
     assert (completed.processed_count, completed.total_count) == (2, 2)
-    assert trocr.calls == 2
+    assert trocr.calls == 4
     with database.connect() as connection:
         assembled = connection.execute("SELECT raw_text,is_partial FROM page_raw_results").fetchone()
         run = connection.execute("SELECT prepared_asset_sha256,trocr_model_version,rslora_adapter_version FROM recognition_runs").fetchone()
         crop_count = connection.execute("SELECT COUNT(*) FROM recognition_line_crops").fetchone()[0]
+        generation = connection.execute(
+            "SELECT generation_json FROM recognition_line_results ORDER BY created_at LIMIT 1"
+        ).fetchone()[0]
     assert assembled["raw_text"] == "raw-line-1\nraw-line-2"
     assert assembled["is_partial"] == 0
     assert run["prepared_asset_sha256"] is not None
     assert (run["trocr_model_version"], run["rslora_adapter_version"]) == ("fake-trocr-v1", "fake-rslora-v1")
     assert crop_count == 2
+    generation_payload = json.loads(generation)
+    assert generation_payload["selected_preprocessing"] == "rectified_rgb"
+    assert [item["preprocessing"] for item in generation_payload["observations"]] == [
+        "rectified_rgb",
+        "rectified_grayscale_autocontrast",
+    ]
+    assert all(item["model_version"] == "fake-trocr-v1" for item in generation_payload["observations"])
+    assert generation_payload["line_crop_quality"]["quality_warning"] is True
+    assert generation_payload["quality_warning"] is True
+
+
+def test_gemini_page_detection_and_crop_recognition_reuse_editor_pipeline(pipeline) -> None:
+    database, storage, repository, owner, page_id = pipeline
+    runtime = _FakeGeminiRuntime()
+    job, duplicate = repository.enqueue(owner, page_id, "gemini-pipeline-001", priority=0, capacity=4, max_attempts=3)
+    assert duplicate is False
+    assert _gemini_service(database, storage, runtime, worker_id="gemini-detector").run_once() is True
+    waiting = repository.get(owner, job.id)
+    assert waiting.state == "awaiting_region_review"
+    with database.connect() as connection:
+        page_revision = int(connection.execute("SELECT revision FROM pages WHERE id=?", (page_id,)).fetchone()[0])
+        sources = [row[0] for row in connection.execute(
+            "SELECT source FROM recognition_regions WHERE page_id=? ORDER BY reading_order", (page_id,)
+        )]
+        detector = connection.execute(
+            "SELECT detector_name,config_json FROM detector_outputs WHERE job_id=?", (job.id,)
+        ).fetchone()
+    assert sources == ["gemini_openrouter", "gemini_openrouter"]
+    assert detector["detector_name"] == "gemini_openrouter"
+    assert json.loads(detector["config_json"])["selected_provider"] == "Google AI Studio"
+
+    _, queued = repository.confirm_regions_and_resume(
+        owner,
+        page_id,
+        expected_page_revision=page_revision,
+        job_id=waiting.id,
+        expected_job_revision=waiting.revision,
+    )
+    assert queued.stage == "recognizing_lines"
+    assert _gemini_service(database, storage, runtime, worker_id="gemini-recognizer").run_once() is True
+    completed = repository.get(owner, job.id)
+    assert completed.state == "completed"
+    with database.connect() as connection:
+        assembled = connection.execute("SELECT raw_text,is_partial FROM page_raw_results").fetchone()
+        generation = json.loads(connection.execute(
+            "SELECT generation_json FROM recognition_line_results ORDER BY created_at LIMIT 1"
+        ).fetchone()[0])
+    assert assembled["raw_text"] == "gemini-line-1\ngemini-line-2"
+    assert assembled["is_partial"] == 0
+    assert generation["provider"] == "openrouter"
+    assert generation["selected_provider"] == "Google AI Studio"
+
+
+def test_fragmented_detector_regions_are_reconstructed_before_trocr(pipeline) -> None:
+    database, storage, repository, owner, page_id = pipeline
+    job, duplicate = repository.enqueue(owner, page_id, "pipeline-fragmented-key-001", priority=0, capacity=4, max_attempts=3)
+    assert duplicate is False
+    assert _service(database, storage, _FakeFragmentedCraftRuntime(), _FakeTrocrRuntime(), worker_id="fragment-detector").run_once() is True
+    waiting = repository.get(owner, job.id)
+    with database.connect() as connection:
+        page_revision = int(connection.execute("SELECT revision FROM pages WHERE id=?", (page_id,)).fetchone()[0])
+        persisted_regions = connection.execute(
+            "SELECT id FROM recognition_regions WHERE page_id=? ORDER BY reading_order",
+            (page_id,),
+        ).fetchall()
+        region_count = len(persisted_regions)
+        audit = connection.execute(
+            "SELECT source_regions_json,line_regions_json,merges_json FROM line_reconstruction_audits WHERE job_id=?",
+            (job.id,),
+        ).fetchone()
+    assert region_count == 1
+    assert str(UUID(persisted_regions[0]["id"])) == persisted_regions[0]["id"]
+    assert audit is not None
+    assert len(json.loads(audit["source_regions_json"])) == 3
+    assert len(json.loads(audit["line_regions_json"])) == 1
+    assert len(json.loads(audit["merges_json"])) == 1
+
+    _, queued = repository.confirm_regions_and_resume(
+        owner,
+        page_id,
+        expected_page_revision=page_revision,
+        job_id=waiting.id,
+        expected_job_revision=waiting.revision,
+    )
+    trocr = _FakeTrocrRuntime()
+    assert _service(database, storage, _FakeCraftRuntime(), trocr, worker_id="fragment-recognizer").run_once() is True
+    assert trocr.calls == 2
+    with database.connect() as connection:
+        assembled = connection.execute("SELECT raw_text FROM page_raw_results WHERE recognition_run_id=(SELECT id FROM recognition_runs WHERE job_id=?)", (queued.id,)).fetchone()
+    assert assembled["raw_text"] == "raw-line-1"
 
 
 def test_partial_line_is_saved_with_placeholder_and_only_failed_line_retries(pipeline) -> None:
@@ -248,7 +476,7 @@ def test_partial_line_is_saved_with_placeholder_and_only_failed_line_retries(pip
     recovered = _FakeTrocrRuntime()
     _service(database, storage, _FakeCraftRuntime(), recovered, worker_id="retry-worker").run_once()
     assert repository.get(owner, waiting.id).state == "completed"
-    assert recovered.calls == 1
+    assert recovered.calls == 2
     with database.connect() as connection:
         raw = connection.execute("SELECT raw_text,is_partial FROM page_raw_results").fetchone()
         resumed_run_id = connection.execute("SELECT id FROM recognition_runs WHERE job_id=?", (waiting.id,)).fetchone()[0]
@@ -279,7 +507,7 @@ def test_worker_crash_preserves_completed_lines_and_active_run_for_restart(pipel
     resumed = _FakeTrocrRuntime()
     _service(database, storage, _FakeCraftRuntime(), resumed, worker_id="restarted-worker").run_once()
     assert repository.get(owner, waiting.id).state == "completed"
-    assert resumed.calls == 1
+    assert resumed.calls == 2
     with database.connect() as connection:
         resumed_run_id = connection.execute("SELECT id FROM recognition_runs WHERE job_id=?", (waiting.id,)).fetchone()[0]
     assert resumed_run_id == run_id
@@ -342,6 +570,18 @@ def test_confirmed_regions_create_padded_immutable_line_crops(pipeline) -> None:
     assert recognition.run_regions(owner, run_id) == snapshot_regions
     assert storage.resolve(crop.storage_key).is_file()
     assert len(current_regions) == 2
+
+
+def test_oriented_line_crop_rectifies_and_quality_gate_only_warns() -> None:
+    page = Image.new("RGB", (240, 120), "white")
+    polygon = ((0.10, 0.35), (0.85, 0.48), (0.84, 0.58), (0.09, 0.45))
+    crop = _crop_image(page, polygon, 0.08)
+    try:
+        assert crop.width > crop.height * 5
+        poor = assess_line_crop(Image.new("RGB", (8, 8), "white"))
+        assert {"width_too_small", "height_too_small", "ink_coverage_low"} <= set(poor["warnings"])
+    finally:
+        crop.close()
 
 
 def test_manual_fallback_replaces_only_failed_raw_line_and_closes_partial_job(pipeline) -> None:

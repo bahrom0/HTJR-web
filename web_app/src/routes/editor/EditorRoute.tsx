@@ -10,6 +10,7 @@ import {
 } from '@features/editor';
 import { getRecognitionResult } from '@features/results/api';
 import { useAccess } from '@shared/access/AccessProvider';
+import { loadEditorDraft, saveEditorDraft } from '@features/editor/persistence';
 import { Button, Icon, LoadingState, Status } from '@shared/ui';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
@@ -54,12 +55,25 @@ export default function EditorRoute() {
     void getEditorDocument(documentId, controller.signal).then((result) => {
       if (controller.signal.aborted) return;
       if (!result.ok) {
-        setMessage(result.error.message);
-        setLoadState('error');
+        void loadEditorDraft(documentId).then((cached) => {
+          if (cached) {
+            setTitle(cached.document.title);
+            setBlocks(cached.lines);
+            setSelectedId(cached.lines[0]?.id ?? null);
+            setDirtyIds(new Set(cached.lines.map((line) => line.id)));
+            setSaveState('dirty');
+            setLoadState('ready');
+            setMessage('Офлайн-черновик загружен из кеша браузера.');
+          } else {
+            setMessage(result.error.message);
+            setLoadState('error');
+          }
+        });
         return;
       }
       setTitle(result.value.document.title);
       setBlocks(result.value.lines);
+      void saveEditorDraft(documentId, result.value);
       setSelectedId(result.value.lines[0]?.id ?? null);
       setDirtyIds(new Set());
       setSaveState('saved');
@@ -140,6 +154,12 @@ export default function EditorRoute() {
     });
     setDirtyIds((current) => new Set(current).add(id));
     setSaveState('dirty');
+    if (documentId) {
+      void saveEditorDraft(documentId, {
+        document: { id: documentId, title, pageCount: 0, createdAt: '', updatedAt: new Date().toISOString(), revision: 0, status: 'draft' },
+        lines: blocksRef.current,
+      });
+    }
   }
 
   async function confirmLine(line: LineBlock) {

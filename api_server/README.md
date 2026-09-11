@@ -27,7 +27,11 @@ prefer CUDA when a compatible NVIDIA GPU is available, or `false` to force CPU
 inference. The worker keeps CRAFT and TrOCR model ownership; the API never
 loads model weights. On CUDA, TrOCR uses FP16 and batches up to
 `[ml].trocr_batch_size` line crops; CPU stays at one crop per generation for
-predictable memory use.
+predictable memory use. Production defaults to
+`[ml].trocr_adapter_mode = "none"`, which runs the verified
+`kazars24/trocr-base-handwritten-ru` backbone without importing PEFT or loading
+the preserved rsLoRA files. Set `HTR_TROCR_ADAPTER_MODE=rslora` only for an
+explicit compatibility/diagnostic run.
 
 For the RTX 4050 Laptop configuration, install the pinned CUDA build into the
 existing environment, then restart the local stack:

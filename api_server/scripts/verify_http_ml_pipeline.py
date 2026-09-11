@@ -241,11 +241,12 @@ def main() -> int:
                     "pipeline_manifest_sha256",
                     "craft_detector_version",
                     "trocr_model_version",
-                    "rslora_adapter_version",
                     "device",
                     "dtype",
                 )):
                     raise RuntimeError("recognition_run_manifest_evidence_missing")
+                if main_module.settings.trocr_adapter_mode == "none" and raw["rslora_adapter_version"] is not None:
+                    raise RuntimeError("base_only_adapter_metadata_present")
         except (OSError, RuntimeError) as error:
             print(json.dumps({"status": "failed", "code": str(error)}, sort_keys=True))
             return 1

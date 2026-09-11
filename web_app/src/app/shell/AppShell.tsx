@@ -4,15 +4,19 @@ import { motion } from 'motion/react';
 
 import { motionTransition, useAccessibleMotion } from '@shared/motion';
 import { PwaUpdateNotice } from '@shared/pwa/PwaUpdateNotice';
-import { ThemeToggle } from '@shared/theme/ThemeToggle';
-import { Icon } from '@shared/ui';
 import { useNetworkStatus } from '@shared/lib/useNetworkStatus';
+
+import { ProjectHeader } from './ProjectHeader';
 
 export function AppShell() {
   const location = useLocation();
   const isOnline = useNetworkStatus();
+  const isLandingRoute = location.pathname === '/';
+  const isDemoRoute = location.pathname === '/0';
   const isAccessRoute = location.pathname.startsWith('/access');
   const isProcessingRoute = location.pathname === '/processing';
+  const isPreparationRoute = location.pathname === '/preparation';
+  const isRegionsRoute = location.pathname === '/regions';
   const canAnimate = useAccessibleMotion();
 
   useLayoutEffect(() => {
@@ -27,32 +31,19 @@ export function AppShell() {
 
   return (
     <div
-      className={`app-shell ${isAccessRoute ? 'app-shell--access' : ''} ${
-        isProcessingRoute ? 'app-shell--immersive' : ''
-      }`}
+      className={`app-shell ${isLandingRoute ? 'app-shell--landing' : ''} ${
+        isAccessRoute ? 'app-shell--access' : ''
+      } ${isProcessingRoute ? 'app-shell--immersive' : ''} ${
+        isPreparationRoute ? 'app-shell--preparation' : ''
+      } ${isRegionsRoute ? 'app-shell--regions' : ''} ${isDemoRoute ? 'app-shell--demo' : ''}`}
     >
       <a className="skip-link" href="#main-content">
         К основному содержимому
       </a>
 
-      {!isAccessRoute && !isProcessingRoute ? (
-        <header className="new-navigation">
-          <nav className="new-navigation__primary" aria-label="Основная навигация">
-            <NavLink to="/" end>
-              Главная
-            </NavLink>
-            <NavLink to="/documents">Документы</NavLink>
-          </nav>
-          <nav className="new-navigation__tools" aria-label="Настройки интерфейса">
-            <NavLink to="/settings" aria-label="Настройки">
-              <Icon name="settings" />
-            </NavLink>
-            <ThemeToggle />
-          </nav>
-        </header>
-      ) : null}
+      {!isLandingRoute && !isAccessRoute && !isProcessingRoute && !isDemoRoute ? <ProjectHeader /> : null}
 
-      {!isOnline && !isAccessRoute ? (
+      {!isOnline && !isLandingRoute && !isAccessRoute ? (
         <NavLink className="offline-banner" to="/offline">
           Нет подключения: часть действий временно недоступна.
         </NavLink>

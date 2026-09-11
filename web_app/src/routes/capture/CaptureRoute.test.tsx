@@ -85,7 +85,7 @@ describe('CaptureRoute', () => {
     await waitFor(() => expect(uploadDocument).toHaveBeenCalledOnce());
     await waitFor(() => expect(removePendingUpload).toHaveBeenCalledOnce());
     await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent('/preparation?pageId=page'),
+      expect(screen.getByTestId('location')).toHaveTextContent('/processing?pageId=page&auto=1'),
     );
     expect(screen.queryByText('Страница безопасно сохранена')).not.toBeInTheDocument();
   });

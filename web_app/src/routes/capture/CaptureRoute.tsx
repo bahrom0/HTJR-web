@@ -30,9 +30,7 @@ export default function CaptureRoute() {
   useEffect(() => {
     void listPendingUploads()
       .then(setPending)
-      .catch(() =>
-        setMessage('Локальное восстановление загрузки недоступно в этом браузере.'),
-      );
+      .catch(() => setMessage('Локальное восстановление загрузки недоступно в этом браузере.'));
   }, []);
 
   useEffect(() => {
@@ -80,7 +78,7 @@ export default function CaptureRoute() {
           items.filter((item) => item.idempotencyKey !== upload.idempotencyKey),
         );
         setSelection(null);
-        navigate(`/preparation?pageId=${encodeURIComponent(response.value.pageId)}`, {
+        navigate(`/processing?pageId=${encodeURIComponent(response.value.pageId)}&auto=1`, {
           replace: true,
         });
       } else {
@@ -89,9 +87,7 @@ export default function CaptureRoute() {
         setPending(await listPendingUploads().catch(() => []));
       }
     } catch {
-      setMessage(
-        'Не удалось сохранить файл для повтора. Проверьте свободное место браузера.',
-      );
+      setMessage('Не удалось сохранить файл для повтора. Проверьте свободное место браузера.');
     } finally {
       setBusy(false);
     }
@@ -157,11 +153,7 @@ export default function CaptureRoute() {
               </span>
               <strong>Перетащите изображение сюда</strong>
               <p>или выберите файл с устройства</p>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => fileInput.current?.click()}
-              >
+              <Button type="button" variant="secondary" onClick={() => fileInput.current?.click()}>
                 Выбрать файл
               </Button>
               <Button type="button" variant="quiet" onClick={() => cameraInput.current?.click()}>
@@ -195,7 +187,7 @@ export default function CaptureRoute() {
         ) : null}
 
         <div className="new-capture__actions">
-          <Link className="ui-button ui-button--secondary" to="/">
+          <Link className="ui-button ui-button--secondary" to="/app">
             Отмена
           </Link>
           <Button type="submit" disabled={!selection || busy} isLoading={busy}>

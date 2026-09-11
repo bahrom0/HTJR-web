@@ -182,6 +182,42 @@ describe('RegionReviewRoute', () => {
     await waitFor(() => expect(saveRegionDraft).toHaveBeenCalled());
   });
 
+  it('keeps wheel zoom inside the canvas instead of scrolling the page', async () => {
+    renderRoute();
+
+    await screen.findByRole('button', { name: /Регион 1: CRAFT/ });
+    const canvas = document.querySelector('.regions-canvas');
+    expect(canvas).toBeInstanceOf(HTMLElement);
+
+    const wheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 120,
+      clientY: 80,
+      deltaY: 100,
+    });
+    expect(canvas?.dispatchEvent(wheel)).toBe(false);
+    expect(wheel.defaultPrevented).toBe(true);
+  });
+
+  it('groups recognized boxes, exact position and zoom into focused editor tabs', async () => {
+    renderRoute();
+
+    await screen.findByRole('button', { name: /Регион 1: CRAFT/ });
+    expect(screen.getByRole('tab', { name: 'Распознавание текста' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByText(/Порядок 1 · X 0.100 · Y 0.200/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Область текста' }));
+    expect(screen.getByRole('heading', { name: 'Свойства строки' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Левый край')).toHaveValue(0.1);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Вид изображения' }));
+    expect(screen.getByRole('button', { name: 'Увеличить масштаб' })).toBeInTheDocument();
+  });
+
   it('restores a same-revision region draft after a refresh instead of silently discarding it', async () => {
     const manualId = '77777777-7777-4777-8777-777777777777';
     vi.mocked(loadRegionDraft).mockResolvedValue({

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import RFC_4122, UUID, uuid4
 
 from app.core.database import Database
 
@@ -17,6 +17,19 @@ class RegionRevisionConflict(Exception):
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _public_region_id(value: object) -> str:
+    """Keep public IDs as UUIDs while detector IDs remain in detector/audit data."""
+    if isinstance(value, str):
+        try:
+            parsed = UUID(value)
+        except ValueError:
+            pass
+        else:
+            if parsed.variant == RFC_4122 and parsed.version is not None and 1 <= parsed.version <= 8:
+                return str(parsed)
+    return str(uuid4())
 
 
 class RegionRepository:
@@ -76,7 +89,7 @@ class RegionRepository:
                            source,flags_json,detector_version,detector_score)
                        VALUES (?,?,?,?,1,?,?,?,?,?,?)""",
                     (
-                        region.get("id") or str(uuid4()),
+                        _public_region_id(region.get("id")),
                         page_id,
                         json.dumps(region["polygon"], separators=(",", ":")),
                         region["reading_order"],

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import struct
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,9 @@ import torch
 
 from app.ml.trocr_runtime import (
     TrocrRuntimeError,
+    _score_generated_tokens,
     _is_windows_pagefile_error,
+    _runtime_modules,
     _stream_safetensors_state,
     inspect_trocr_artifacts,
 )
@@ -34,6 +37,60 @@ def test_trocr_manifest_rejects_missing_base_adapter_and_corrupt_artifacts(tmp_p
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     assert inspect_trocr_artifacts(tmp_path).code == "trocr_artifacts_corrupt"
+
+
+def test_trocr_manifest_accepts_base_only_without_adapter_metadata(tmp_path: Path) -> None:
+    payload = b"base-model-fixture"
+    (tmp_path / "trocr").mkdir()
+    (tmp_path / "trocr" / "config.json").write_bytes(payload)
+    manifest = {
+        "schema_version": 1,
+        "models": {
+            "trocr": {"version": "base-v1", "artifacts": [_artifact("trocr/config.json", payload)]},
+            # A broken optional adapter must not make base-only readiness fail.
+            "tajik_rslora": {
+                "version": "adapter-v1",
+                "artifacts": [_artifact("tajik_rslora/config.json", b"missing")],
+            },
+        },
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    status = inspect_trocr_artifacts(tmp_path)
+
+    assert status.ready is True
+    assert status.model_version == "base-v1"
+    assert status.adapter_version is None
+    assert status.adapter_root is None
+    assert inspect_trocr_artifacts(tmp_path, adapter_mode="rslora").code == "trocr_artifacts_corrupt"
+
+
+def test_sequence_confidence_excludes_padding_and_tokens_after_eos() -> None:
+    score, token_count = _score_generated_tokens(
+        [101, 102, 2, 1, 1],
+        [-0.2, -0.4, -0.6, -99.0, -99.0],
+        eos_token_id=2,
+        pad_token_id=1,
+    )
+
+    assert score == pytest.approx(-0.3)
+    assert token_count == 2
+
+
+def test_sequence_confidence_is_individual_for_rows_with_different_lengths() -> None:
+    first = _score_generated_tokens([10, 2, 1, 1], [-0.1, -0.2, -50.0, -50.0], eos_token_id=2, pad_token_id=1)
+    second = _score_generated_tokens([20, 21, 22, 2], [-0.9, -0.9, -0.9, -0.1], eos_token_id=2, pad_token_id=1)
+
+    assert first == (pytest.approx(-0.1), 1)
+    assert second == (pytest.approx(-0.9), 3)
+
+
+def test_base_runtime_module_loader_does_not_import_peft() -> None:
+    sys.modules.pop("peft", None)
+
+    _runtime_modules()
+
+    assert "peft" not in sys.modules
 
 
 def test_model_migration_copies_verified_artifacts_and_never_changes_source(tmp_path: Path) -> None:

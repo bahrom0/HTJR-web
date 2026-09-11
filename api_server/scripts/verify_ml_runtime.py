@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Run the local CRAFT -> TrOCR+rsLoRA path without exposing image or text data."""
+"""Run the local CRAFT -> base TrOCR path without exposing image or text data."""
 
 import argparse
 import hashlib
